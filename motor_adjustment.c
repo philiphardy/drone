@@ -1,28 +1,20 @@
 #include <stdio.h>
+#include "pico/mem_ops.h"
 #include "pico/multicore.h"
-#include "vector_3d.h"
 
-static void motor_adjustment_task_entry();
+static void task_entry();
 
 void motor_adjustment_init() {
     // start task on core 1
-    multicore_launch_core1(motor_adjustment_task_entry);
+    multicore_launch_core1(task_entry);
 }
 
-static void motor_adjustment_task_entry() {
+static void task_entry() {
     while (true) {
-        vector_3d currAccel = (vector_3d) {
-            .x = (int16_t)multicore_fifo_pop_blocking(),
-            .y = (int16_t)multicore_fifo_pop_blocking(),
-            .z = (int16_t)multicore_fifo_pop_blocking()
-        };
-        printv("MA current accel", &currAccel);
-
-        vector_3d deltaAccel = (vector_3d) {
-            .x = (int16_t)multicore_fifo_pop_blocking(),
-            .y = (int16_t)multicore_fifo_pop_blocking(),
-            .z = (int16_t)multicore_fifo_pop_blocking()
-        };
-        printv("MA delta accel", &deltaAccel);
+        uint32_t msg = multicore_fifo_pop_blocking();
+        float pitch = *(float *)&msg;
+        msg = multicore_fifo_pop_blocking();
+        float roll = *(float *)&msg;
+        printf("Pitch: %.2f  Roll: %.2f\n", pitch, roll);
     }
 }

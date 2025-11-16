@@ -41,6 +41,12 @@
         "binary_info.h": "c",
         "mpu6050.h": "c",
         "compare": "c",
-        "cstdint": "c"
+        "cstdint": "c",
+        "stdlib.h": "c",
+        "math.h": "c",
+        "mem_ops.h": "c",
+        "cstring": "c",
+        "variant": "c",
+        "types.h": "c"
     }
 }

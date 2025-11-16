@@ -14,10 +14,10 @@
 #define I2C_SDA_PIN 21
 #define I2C_SCL_PIN 20
 
-static void mpu6050_reset(void);
+static void mpu6050_reset();
 
 #ifdef i2c_default
-    void mpu6050_init(void) {
+    void mpu6050_init() {
         // This will use I2C0 on pins 21 (SDA) and 20 (SCL)
         i2c_init(i2c_default, 400 * 1000);
         gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_I2C);
@@ -31,7 +31,7 @@ static void mpu6050_reset(void);
         mpu6050_reset();
     }
 
-    static void mpu6050_reset(void) {
+    static void mpu6050_reset() {
         // Two byte reset. First byte register, second byte data
         // There are a load more options to set up the device in different ways that could be added here
         uint8_t buf[] = {0x6B, 0x80};
@@ -44,7 +44,7 @@ static void mpu6050_reset(void);
         sleep_ms(10); // Allow stabilization after waking up
     }
 
-    vector_3d mpu6050_read_acceleration(void) {
+    vector_3d mpu6050_read_acceleration() {
         // For this particular device, we send the device the register we want to read
         // first, then subsequently read from the device. The register is auto incrementing
         // so we don't need to keep sending the register we want, just the first.
@@ -65,7 +65,7 @@ static void mpu6050_reset(void);
         return v;
     }
 
-    vector_3d mpu6050_read_gyro(void) {
+    vector_3d mpu6050_read_gyro() {
         // For this particular device, we send the device the register we want to read
         // first, then subsequently read from the device. The register is auto incrementing
         // so we don't need to keep sending the register we want, just the first.
