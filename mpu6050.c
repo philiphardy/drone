@@ -17,6 +17,13 @@
 static void mpu6050_reset();
 
 #ifdef i2c_default
+    /**
+     * mpu6050_init
+     *
+     * Initialize I2C and configure the MPU6050 device. This sets up I2C0
+     * at 400kHz on the configured SDA/SCL pins, enables pull-ups, and calls
+     * `mpu6050_reset()` to ensure the device is awake and in a known state.
+     */
     void mpu6050_init() {
         // This will use I2C0 on pins 21 (SDA) and 20 (SCL)
         i2c_init(i2c_default, 400 * 1000);
@@ -31,6 +38,14 @@ static void mpu6050_reset();
         mpu6050_reset();
     }
 
+    /**
+     * mpu6050_reset
+     *
+     * Perform a basic software reset and wake-up sequence on the MPU6050.
+     * Writes to register 0x6B (PWR_MGMT_1) — first to reset, then to clear
+     * sleep bit. This is a minimal initialization; further configuration
+     * (sample rates, ranges, filters) can be added as needed.
+     */
     static void mpu6050_reset() {
         // Two byte reset. First byte register, second byte data
         // There are a load more options to set up the device in different ways that could be added here
@@ -44,6 +59,16 @@ static void mpu6050_reset();
         sleep_ms(10); // Allow stabilization after waking up
     }
 
+    /**
+     * mpu6050_read_acceleration
+     *
+     * Read raw accelerometer registers (6 bytes starting at 0x3B) and
+     * return them in a `vector_3d` structure. Values are raw 16-bit signed
+     * integers combined from high/low bytes (big-endian), commonly used as
+     * LSB counts. To convert to g use the ACCEL scale (e.g. `ACCEL_SENS_2G`).
+     *
+     * @return vector_3d with raw `.x`, `.y`, `.z` acceleration LSB values
+     */
     vector_3d mpu6050_read_acceleration() {
         // For this particular device, we send the device the register we want to read
         // first, then subsequently read from the device. The register is auto incrementing
@@ -65,6 +90,16 @@ static void mpu6050_reset();
         return v;
     }
 
+    /**
+     * mpu6050_read_gyro
+     *
+     * Read raw gyroscope registers (6 bytes starting at 0x43) and return
+     * them in a `vector_3d`. Values are raw 16-bit signed integers (MSB/LSB
+     * pairs). To convert to degrees/sec use the gyro sensitivity (e.g.
+     * `GYRO_SENS_250DPS`).
+     *
+     * @return vector_3d with raw `.x`, `.y`, `.z` gyro LSB values
+     */
     vector_3d mpu6050_read_gyro() {
         // For this particular device, we send the device the register we want to read
         // first, then subsequently read from the device. The register is auto incrementing

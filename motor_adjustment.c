@@ -15,11 +15,27 @@ static float normalize_power(float p);
 
 static float hovering_power;
 
+/**
+ * motor_adjustment_init
+ *
+ * Launch the motor adjustment task on core 1. The task listens for pitch
+ * and roll values on the multicore FIFO and updates per-motor power levels.
+ */
 void motor_adjustment_init() {
     // start task on core 1
     multicore_launch_core1(task_entry);
 }
 
+/**
+ * task_entry
+ *
+ * Core1 entrypoint: blocks on the multicore FIFO for two 32-bit words
+ * representing the current `pitch` and `roll` (in that order). Each value
+ * is sent as the float bit-pattern cast to `uint32_t` on the producing core.
+ *
+ * When a pair is received the task computes and applies per-motor power
+ * adjustments (here represented by internal variables and debug prints).
+ */
 static void task_entry() {
     while (true) {
         uint32_t msg = multicore_fifo_pop_blocking();
@@ -36,6 +52,13 @@ static void task_entry() {
 }
 
 static float front_motor_power;
+/**
+ * adjust_front_motor
+ *
+ * Compute and set the front motor power based on `pitch` (degrees).
+ * - `pitch` is expected in degrees.
+ * - Uses `MAX_ANGLE` to scale the control multiplier.
+ */
 static void adjust_front_motor(float pitch) {
     float multiplier = fabsf(pitch / MAX_ANGLE);
     if (pitch < 0) {
@@ -51,6 +74,11 @@ static void adjust_front_motor(float pitch) {
 }
 
 static float back_motor_power;
+/**
+ * adjust_back_motor
+ *
+ * Compute and set the back motor power based on `pitch` (degrees).
+ */
 static void adjust_back_motor(float pitch) {
     float multiplier = fabsf(pitch / MAX_ANGLE);
     if (pitch > 0) {
@@ -66,6 +94,11 @@ static void adjust_back_motor(float pitch) {
 }
 
 static float left_motor_power;
+/**
+ * adjust_left_motor
+ *
+ * Compute and set the left motor power based on `roll` (degrees).
+ */
 static void adjust_left_motor(float roll) {
     float multiplier = fabsf(roll / MAX_ANGLE);
     if (roll < 0) {
@@ -81,19 +114,32 @@ static void adjust_left_motor(float roll) {
 }
 
 static float right_motor_power;
+/**
+ * adjust_right_motor
+ *
+ * Compute and set the right motor power based on `roll` (degrees).
+ */
 static void adjust_right_motor(float roll) {
     float multiplier = fabsf(roll / MAX_ANGLE);
     if (roll > 0) {
         multiplier += 1;
     } else {
         // rear is pitching up -- decrease motor power
-        float multiplier = 1 - multiplier;
+        multiplier = 1 - multiplier;
     }
     right_motor_power = hovering_power * multiplier;
     right_motor_power = normalize_power(right_motor_power);
     printf("RP: %.2f\n", multiplier);
 }
 
+/**
+ * normalize_power
+ *
+ * Clamp motor power to the valid range [0, MAX_POWER].
+ *
+ * @param p Desired power value (float)
+ * @return Clamped power value (float)
+ */
 static float normalize_power(float p) {
     p = MAX(0, p);
     p = MIN(MAX_POWER, p);

@@ -38,17 +38,53 @@ static float roll  = 0.0f;
 static float pitch_offset = 0.0f;
 static float roll_offset  = 0.0f;
 
+/**
+ * flight_control_init
+ *
+ * Initialize subsystems required for flight control:
+ * - Initialize MPU6050 IMU via `mpu6050_init()`
+ * - Initialize motor adjustment task via `motor_adjustment_init()`
+ * - Enter the flight control task loop (`task_entry`).
+ *
+ * This function configures hardware and then transfers control to the
+ * internal task loop; it does not return until the system halts.
+ */
 void flight_control_init() {
     mpu6050_init();
     motor_adjustment_init();
     task_entry();
 }
 
+/**
+ * radians_to_degrees
+ *
+ * Convert radians to degrees.
+ *
+ * @param r Angle in radians
+ * @return Angle in degrees
+ */
 static inline float radians_to_degrees(float r) {
     return r * (180.0f / M_PI);
 }
 
-// Call this every loop with dt in SECONDS
+/**
+ * complementary_filter_update
+ *
+ * Update the fused pitch and roll estimates using a complementary filter.
+ *
+ * Inputs:
+ * - `accel`: accelerometer readings (raw LSB)
+ * - `gyro` : gyroscope readings (raw LSB)
+ * - `dt`   : elapsed time in seconds since last update
+ *
+ * Behavior:
+ * - Computes accelerometer-based pitch/roll (degrees) using `atan2f`.
+ * - Integrates gyro rates (converted to deg/s) to predict change.
+ * - Blends the gyro integration and accel estimate using the ALPHA constant.
+ *
+ * Side effects:
+ * - Updates the module-wide `pitch` and `roll` (degrees).
+ */
 static void complementary_filter_update(vector_3d * accel, vector_3d * gyro, float dt)
 {
     // Convert accel to g units
@@ -76,14 +112,36 @@ static void complementary_filter_update(vector_3d * accel, vector_3d * gyro, flo
     roll  = ALPHA * roll  + (1.0f - ALPHA) * roll_acc;
 }
 
+/**
+ * get_pitch
+ *
+ * Return the current fused pitch (degrees) with calibration offset removed.
+ */
 static inline float get_pitch() {
     return pitch - pitch_offset;
 }
 
+/**
+ * get_roll
+ *
+ * Return the current fused roll (degrees) with calibration offset removed.
+ */
 static inline float get_roll() {
     return roll - roll_offset;
 }
 
+/**
+ * task_entry
+ *
+ * Main flight control loop. Responsibilities:
+ * - Read accelerometer and gyro samples from the IMU
+ * - Compute elapsed time `dt` using `time_us_32()` (converted to seconds)
+ * - Run the complementary filter to update fused angles
+ * - Perform a short calibration on startup (see `CALIBRATION_CYCLES`)
+ * - When operating, send pitch and roll to the motor adjustment core
+ *
+ * The loop sleeps for `LOOP_SLEEP_MS` milliseconds each iteration.
+ */
 static void task_entry() {
     uint32_t last_time = 0;
     uint8_t cycles = 0;
@@ -112,6 +170,15 @@ static void task_entry() {
     }
 }
 
+/**
+ * notify_motor_adjustment
+ *
+ * Package the current pitch and roll values into the multicore FIFO so the
+ * motor adjustment task (running on core1) can consume them. The order is
+ * critical: pitch is pushed first, then roll. Values are sent as their raw
+ * 32-bit bit-pattern (`float` -> `uint32_t`) so the receiving core can
+ * reinterpret the bits back into floats.
+ */
 static void notify_motor_adjustment() {
     // DO NOT REORDER!!!
     // The motor adjustment task relies on the queue being structured this way
