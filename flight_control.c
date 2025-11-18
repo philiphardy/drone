@@ -13,7 +13,7 @@
 // Complementary filter constant
 #define ALPHA 0.98f   // 98% gyro, 2% accel
 
-#define LOOP_SLEEP_MS 5
+#define LOOP_SLEEP_MS 1
 
 #define CALIBRATION_CYCLES 250
 

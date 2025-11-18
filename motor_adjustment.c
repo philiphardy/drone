@@ -1,19 +1,32 @@
 #include <stdio.h>
 #include <math.h>
+#include "hardware/pwm.h"
+#include "pico/binary_info.h"
 #include "pico/mem_ops.h"
 #include "pico/multicore.h"
+#include "pico/stdlib.h"
 
 #define MAX_POWER 100
 #define MAX_ANGLE 90
 
+#define NUM_MOTORS 4
+
+#define FRONT_MOTOR_PIN 22
+#define BACK_MOTOR_PIN 17
+#define LEFT_MOTOR_PIN 14
+#define RIGHT_MOTOR_PIN 10
+
 static void task_entry();
+static void setup_pwm();
+static void adjust_pwm(uint32_t pin, float power);
 static void adjust_front_motor(float pitch);
 static void adjust_back_motor(float pitch);
 static void adjust_left_motor(float roll);
 static void adjust_right_motor(float roll);
 static float normalize_power(float p);
 
-static float hovering_power;
+// TODO: Calculate at task startup after calibration has been completed in flight control task
+static float hovering_power = 50.0f;
 
 /**
  * motor_adjustment_init
@@ -22,8 +35,56 @@ static float hovering_power;
  * and roll values on the multicore FIFO and updates per-motor power levels.
  */
 void motor_adjustment_init() {
+    setup_pwm();
+
     // start task on core 1
     multicore_launch_core1(task_entry);
+}
+
+/**
+ * setup_pwm
+ *
+ * Configure the motor GPIOs for PWM output and initialize the
+ * PWM slice. The function sets the PWM wrap value to `MAX_POWER - 1` so
+ * that `power` values in the range [0, MAX_POWER] map directly to the
+ * channel level (after casting).
+ */
+static void setup_pwm() {
+    bi_decl(bi_1pin_with_func(FRONT_MOTOR_PIN, GPIO_FUNC_PWM));
+    bi_decl(bi_1pin_with_func(BACK_MOTOR_PIN, GPIO_FUNC_PWM));
+    bi_decl(bi_1pin_with_func(LEFT_MOTOR_PIN, GPIO_FUNC_PWM));
+    bi_decl(bi_1pin_with_func(RIGHT_MOTOR_PIN, GPIO_FUNC_PWM));
+
+    uint32_t motor_pins[] = {FRONT_MOTOR_PIN, BACK_MOTOR_PIN, LEFT_MOTOR_PIN, RIGHT_MOTOR_PIN};
+    for (uint8_t i = 0; i < NUM_MOTORS; i++) {
+        uint32_t pin = motor_pins[i];
+
+        gpio_set_function(pin, GPIO_FUNC_PWM);
+
+        uint32_t slice = pwm_gpio_to_slice_num(pin);
+        uint32_t channel = pwm_gpio_to_channel(pin);
+    
+        pwm_set_wrap(slice, MAX_POWER-1);
+        pwm_set_chan_level(slice, channel, 0);
+        pwm_set_enabled(slice, true);
+    }
+}
+
+/**
+ * adjust_pwm
+ *
+ * Set the PWM duty level for a motor pin.
+ *
+ * @param pin GPIO pin number configured for PWM
+ * @param power Duty level expressed in the same units as the PWM wrap
+ *              (0 .. MAX_POWER). The value is cast to `uint16_t` before
+ *              being written to the PWM channel.
+ */
+static void adjust_pwm(uint32_t pin, float power) {
+    uint32_t slice = pwm_gpio_to_slice_num(pin);
+    uint32_t channel = pwm_gpio_to_channel(pin);
+    pwm_set_chan_level(slice, channel, (uint16_t)power);
+    printf("Power: %d\n", (uint16_t)power);
 }
 
 /**
@@ -51,7 +112,6 @@ static void task_entry() {
     }
 }
 
-static float front_motor_power;
 /**
  * adjust_front_motor
  *
@@ -62,18 +122,17 @@ static float front_motor_power;
 static void adjust_front_motor(float pitch) {
     float multiplier = fabsf(pitch / MAX_ANGLE);
     if (pitch < 0) {
-        // nose is pitching down -- increase motor power
+        // front is pitching down -- increase motor power
         multiplier += 1;
     } else {
-        // nose is pitching up -- decrease motor power
+        // front is pitching up -- decrease motor power
         multiplier = 1 - multiplier;
     }
-    front_motor_power = hovering_power * multiplier;
-    front_motor_power = normalize_power(front_motor_power);
-    printf("FP: %.2f\n", multiplier);
+    float motor_power = normalize_power(hovering_power * multiplier);
+    printf("Front ");
+    adjust_pwm(FRONT_MOTOR_PIN, motor_power);
 }
 
-static float back_motor_power;
 /**
  * adjust_back_motor
  *
@@ -82,18 +141,17 @@ static float back_motor_power;
 static void adjust_back_motor(float pitch) {
     float multiplier = fabsf(pitch / MAX_ANGLE);
     if (pitch > 0) {
-        // rear is pitching down -- increase motor power
+        // back is pitching down -- increase motor power
         multiplier += 1;
     } else {
-        // rear is pitching up -- decrease motor power
+        // back is pitching up -- decrease motor power
         multiplier = 1 - multiplier;
     }
-    back_motor_power = hovering_power * back_motor_power;
-    back_motor_power = normalize_power(back_motor_power);
-    printf("BP: %.2f\n", multiplier);
+    float motor_power = normalize_power(hovering_power * multiplier);
+    printf("Back ");
+    adjust_pwm(BACK_MOTOR_PIN, motor_power);
 }
 
-static float left_motor_power;
 /**
  * adjust_left_motor
  *
@@ -102,18 +160,17 @@ static float left_motor_power;
 static void adjust_left_motor(float roll) {
     float multiplier = fabsf(roll / MAX_ANGLE);
     if (roll < 0) {
-        // rear is pitching down -- increase motor power
+        // left is pitching down -- increase motor power
         multiplier += 1;
     } else {
-        // rear is pitching up -- decrease motor power
+        // left is pitching up -- decrease motor power
         multiplier = 1 - multiplier;
     }
-    left_motor_power = hovering_power * multiplier;
-    left_motor_power = normalize_power(left_motor_power);
-    printf("LP: %.2f\n", multiplier);
+    float motor_power = normalize_power(hovering_power * multiplier);
+    printf("Left ");
+    adjust_pwm(LEFT_MOTOR_PIN, motor_power);
 }
 
-static float right_motor_power;
 /**
  * adjust_right_motor
  *
@@ -122,14 +179,15 @@ static float right_motor_power;
 static void adjust_right_motor(float roll) {
     float multiplier = fabsf(roll / MAX_ANGLE);
     if (roll > 0) {
+        // right is pitching down -- decrease motor power
         multiplier += 1;
     } else {
-        // rear is pitching up -- decrease motor power
+        // right is pitching up -- decrease motor power
         multiplier = 1 - multiplier;
     }
-    right_motor_power = hovering_power * multiplier;
-    right_motor_power = normalize_power(right_motor_power);
-    printf("RP: %.2f\n", multiplier);
+    float motor_power = normalize_power(hovering_power * multiplier);
+    printf("Right ");
+    adjust_pwm(RIGHT_MOTOR_PIN, motor_power);
 }
 
 /**

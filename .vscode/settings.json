@@ -47,6 +47,8 @@
         "mem_ops.h": "c",
         "cstring": "c",
         "variant": "c",
-        "types.h": "c"
+        "types.h": "c",
+        "format": "c",
+        "ostream": "c"
     }
 }
