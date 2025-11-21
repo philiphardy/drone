@@ -43,7 +43,7 @@ Alternatively, use the provided VS Code tasks: `Compile Project` builds with the
 
 **Wiring**
 
-TODO: Include wiring schematic
+![Drone Wiring](./wiring.png)
 
 **Source Layout**
 
