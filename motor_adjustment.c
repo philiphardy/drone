@@ -6,6 +6,7 @@
 #include "pico/multicore.h"
 #include "pico/stdlib.h"
 
+// TODO: Reduce max power to 90% to avoid burning out motors since 4.5v battery supply will be used
 #define MAX_POWER 100
 #define MAX_ANGLE 90
 
