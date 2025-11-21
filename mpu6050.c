@@ -11,8 +11,8 @@
 
 // By default these devices are on bus address 0x68
 #define ADDR 0x68
-#define I2C_SDA_PIN 21
-#define I2C_SCL_PIN 20
+#define I2C_SDA_PIN 20
+#define I2C_SCL_PIN 21
 
 static void mpu6050_reset();
 
