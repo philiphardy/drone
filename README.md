@@ -43,7 +43,7 @@ Alternatively, use the provided VS Code tasks: `Compile Project` builds with the
 
 **Wiring**
 
-![Drone Wiring](./wiring.png)
+TODO
 
 **Source Layout**
 
