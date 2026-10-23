@@ -32,14 +32,10 @@ Alternatively, use the provided VS Code tasks: `Compile Project` builds with the
 
 **Hardware**
 
-- 1 x 4.5v Power Supply
+- 1 x 7.6v 2S LiPo Power Supply
 - 1 x RP2040 (MCU)
 - 1 x MPU6050 (IMU)
-- 4 x 716 Coreless Brushed DC Motor 
-- 4 x AO3400A N-Channel MOSFET
-- 4 x 100Ω Resistor
-- 4 x SS14 Schottky diode
-- 1 x 220µF Capacitor
+TODO
 
 **Wiring**
 
