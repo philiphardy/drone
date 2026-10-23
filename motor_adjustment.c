@@ -12,10 +12,10 @@
 
 #define NUM_MOTORS 4
 
-#define FRONT_MOTOR_PIN 22
-#define BACK_MOTOR_PIN 17
-#define LEFT_MOTOR_PIN 14
-#define RIGHT_MOTOR_PIN 10
+#define FRONT_MOTOR_PIN 19
+#define BACK_MOTOR_PIN 16
+#define RIGHT_MOTOR_PIN 17
+#define LEFT_MOTOR_PIN 15
 
 static void task_entry();
 static void setup_pwm();
@@ -39,7 +39,7 @@ void motor_adjustment_init() {
     setup_pwm();
 
     // start task on core 1
-    multicore_launch_core1(task_entry);
+    // multicore_launch_core1(task_entry);
 }
 
 /**
@@ -66,7 +66,7 @@ static void setup_pwm() {
         uint32_t channel = pwm_gpio_to_channel(pin);
     
         pwm_set_wrap(slice, MAX_POWER-1);
-        pwm_set_chan_level(slice, channel, 0);
+        pwm_set_chan_level(slice, channel, 90);
         pwm_set_enabled(slice, true);
     }
 }

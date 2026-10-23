@@ -50,9 +50,9 @@ static float roll_offset  = 0.0f;
  * internal task loop; it does not return until the system halts.
  */
 void flight_control_init() {
-    mpu6050_init();
+    // mpu6050_init();
     motor_adjustment_init();
-    task_entry();
+    // task_entry();
 }
 
 /**
