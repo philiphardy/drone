@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(drone main.c mpu6050.c kalman.c)
+add_executable(drone main.c mpu6050.c kalman.c motor.c)
 
 pico_set_program_name(drone "drone")
 pico_set_program_version(drone "0.1")

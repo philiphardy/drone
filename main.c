@@ -4,6 +4,7 @@
 #include "hardware/i2c.h"
 #include "mpu6050.h"
 #include "kalman.h"
+#include "motor.h"
 
 #define RAD_TO_DEG (180.0f / (float)M_PI)
 #define SAMPLE_PERIOD_US 10000          // 100 Hz
@@ -50,9 +51,12 @@ static void calibrate_gyro_bias(float gyro_scale,
 
 int main(void) {
     stdio_init_all();
-
+    
     // Let the USB CDC serial port enumerate before we print.
     sleep_ms(10000);
+
+    // Start sending the idle pulse immediately so the ESC can initialize.
+    motor_init();
 
     if (!mpu6050_init()) {
         printf("MPU6050 init failed — halting\n");
@@ -87,6 +91,12 @@ int main(void) {
         kalman_init(&roll_kf,  0.0f);
         kalman_init(&pitch_kf, 0.0f);
     }
+
+    // Arm (idle pulse for >= 3 s), then spin at 25% throttle.
+    printf("Arming ESC...\n");
+    motor_arm();
+    motor_set_throttle_percent(25.0f);
+    printf("Motor running at 25%% throttle\n");
 
     uint64_t last_us = time_us_64();
 
