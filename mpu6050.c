@@ -66,17 +66,182 @@ enum {
 static const float ACCEL_SCALE = 16384.0f;   // LSB per g
 static const float GYRO_SCALE  = 131.0f;     // LSB per °/s
 
+// Configuration applied after reset (and re-applied after bus recovery).
+static const struct {
+    uint8_t reg;
+    uint8_t val;
+    const char *name;
+} cfg[] = {
+    { REG_CONFIG,       0x03, "CONFIG (DLPF_CFG=3)"         },
+    { REG_SMPLRT_DIV,   0x09, "SMPLRT_DIV (=9, 100 Hz)"     },
+    { REG_GYRO_CONFIG,  0x00, "GYRO_CONFIG (FS_SEL=0, ±250)"},
+    { REG_ACCEL_CONFIG, 0x00, "ACCEL_CONFIG (AFS_SEL=0, ±2g)"},
+};
+
+// ── I2C timeout / recovery tuning ────────────────────────────────
+#define I2C_BAUDRATE_HZ            (400 * 1000)
+// Whole-transaction timeout per i2c_*_timeout_us call. A 14-byte burst at
+// 400 kHz takes ~0.4 ms, and the control loop period is 25 ms, so this
+// leaves generous margin without stalling the loop on a dead bus.
+#define I2C_TIMEOUT_US             3000
+// Non-timeout failures (e.g. NAK) trigger recovery after this many in a row.
+// A timeout triggers recovery immediately.
+#define I2C_FAILS_BEFORE_RECOVERY  3
+// Bit-bang half period; 5 us (100 kHz) is safe for any I2C device.
+#define I2C_RECOVERY_HALF_PERIOD_US 5
+// Max clock pulses to flush a slave: 8 data bits + 1 ACK bit.
+#define I2C_RECOVERY_CLOCK_PULSES  9
+// Max time to wait for a clock-stretching slave to release SCL.
+#define I2C_RECOVERY_STRETCH_US    1000
+
+static uint32_t consecutive_failures = 0;
+static uint32_t recovery_count = 0;
+
 static bool mpu6050_reset(void);
 
-// Write one register. Returns false on I2C failure and logs the reason.
-static bool mpu6050_write_reg(uint8_t reg, uint8_t val) {
+// Attach the I2C peripheral to the pins with pull-ups enabled.
+static void i2c_bus_attach(void) {
+    i2c_init(MPU_I2C, I2C_BAUDRATE_HZ);
+    gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_I2C);
+    gpio_set_function(I2C_SCL_PIN, GPIO_FUNC_I2C);
+    gpio_pull_up(I2C_SDA_PIN);
+    gpio_pull_up(I2C_SCL_PIN);
+}
+
+// Open-drain style SCL release: switch to input and let the pull-up raise
+// the line, so we never fight a clock-stretching slave. Returns false if
+// SCL does not rise within I2C_RECOVERY_STRETCH_US.
+static bool bb_scl_release(void) {
+    gpio_set_dir(I2C_SCL_PIN, GPIO_IN);
+    absolute_time_t deadline = make_timeout_time_us(I2C_RECOVERY_STRETCH_US);
+    while (!gpio_get(I2C_SCL_PIN)) {
+        if (time_reached(deadline)) return false;
+    }
+    return true;
+}
+
+/**
+ * i2c_bus_recover
+ *
+ * Frees a bus where a slave is holding SDA low (typically after the MCU
+ * was reset or an I2C transaction was aborted mid-byte). Takes the pins
+ * away from the I2C block, clocks SCL up to 9 times until the slave
+ * releases SDA, issues a STOP, then re-initializes the peripheral.
+ *
+ * SDA/SCL are driven open-drain style (output-low or input/pulled-up),
+ * never actively high, so this is safe against a stretching slave.
+ * Returns true if both SDA and SCL are high afterwards.
+ */
+static bool i2c_bus_recover(void) {
+    const uint32_t half = I2C_RECOVERY_HALF_PERIOD_US;
+
+    // Reset the peripheral too: a timed-out transfer can leave it wedged.
+    i2c_deinit(MPU_I2C);
+
+    gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_SIO);
+    gpio_set_function(I2C_SCL_PIN, GPIO_FUNC_SIO);
+    gpio_put(I2C_SDA_PIN, 0);       // output value is 0 whenever dir = OUT
+    gpio_put(I2C_SCL_PIN, 0);
+    gpio_set_dir(I2C_SDA_PIN, GPIO_IN);
+    gpio_set_dir(I2C_SCL_PIN, GPIO_IN);
+    gpio_pull_up(I2C_SDA_PIN);
+    gpio_pull_up(I2C_SCL_PIN);
+    sleep_us(half);
+
+    if (!gpio_get(I2C_SDA_PIN)) {
+        for (int i = 0; i < I2C_RECOVERY_CLOCK_PULSES; i++) {
+            gpio_set_dir(I2C_SCL_PIN, GPIO_OUT);   // SCL low
+            sleep_us(half);
+            bool scl_ok = bb_scl_release();        // SCL high
+            sleep_us(half);
+            if (!scl_ok || gpio_get(I2C_SDA_PIN)) break;
+        }
+    }
+
+    // STOP: SDA low -> high while SCL is high. Pull SCL low first so SDA
+    // can move without being mistaken for a START/STOP mid-clock.
+    gpio_set_dir(I2C_SCL_PIN, GPIO_OUT);           // SCL low
+    sleep_us(half);
+    gpio_set_dir(I2C_SDA_PIN, GPIO_OUT);           // SDA low
+    sleep_us(half);
+    bb_scl_release();                              // SCL high
+    sleep_us(half);
+    gpio_set_dir(I2C_SDA_PIN, GPIO_IN);            // SDA high -> STOP
+    sleep_us(half);
+
+    bool free_bus = gpio_get(I2C_SDA_PIN) && gpio_get(I2C_SCL_PIN);
+
+    i2c_bus_attach();
+    return free_bus;
+}
+
+// Write one register with a timeout, no logging and no recovery.
+// Returns the SDK result (bytes written, or a negative PICO_ERROR_*).
+static int mpu6050_write_reg_raw(uint8_t reg, uint8_t val) {
     uint8_t buf[2] = {reg, val};
-    int n = i2c_write_blocking(MPU_I2C, ADDR, buf, 2, false);
+    return i2c_write_timeout_us(MPU_I2C, ADDR, buf, 2, false, I2C_TIMEOUT_US);
+}
+
+/**
+ * mpu6050_recover_bus
+ *
+ * Clear a stuck bus and put the sensor back into its operating
+ * configuration (wake + DLPF/rate/ranges; no DEVICE_RESET, so no 100 ms
+ * stall). Safe to call from the control loop. Returns true only if the
+ * bus was freed and every config write succeeded.
+ */
+bool mpu6050_recover_bus(void) {
+    recovery_count++;
+    consecutive_failures = 0;
+
+    if (!i2c_bus_recover()) {
+        MPU_ERR("bus recovery failed — SDA/SCL still held low\n");
+        return false;
+    }
+
+    // Wake / select PLL clock in case the sensor power-cycled, then restore
+    // the configuration. Raw writes: must not re-enter the failure handler.
+    bool ok = mpu6050_write_reg_raw(REG_PWR_MGMT_1, 0x01) == 2;
+    for (size_t i = 0; i < sizeof(cfg) / sizeof(cfg[0]); i++) {
+        ok &= mpu6050_write_reg_raw(cfg[i].reg, cfg[i].val) == 2;
+    }
+    if (!ok) {
+        MPU_ERR("bus freed but sensor reconfiguration failed\n");
+        return false;
+    }
+    MPU_ERR("bus recovered (count=%lu)\n", (unsigned long)recovery_count);
+    return true;
+}
+
+uint32_t mpu6050_bus_recovery_count(void) {
+    return recovery_count;
+}
+
+// Track transaction results. A timeout means the bus or slave is hung and
+// triggers recovery at once; other errors must persist before we act.
+static void mpu6050_note_result(int ret, bool ok) {
+    if (ok) {
+        consecutive_failures = 0;
+        return;
+    }
+    consecutive_failures++;
+    if (ret == PICO_ERROR_TIMEOUT ||
+        consecutive_failures >= I2C_FAILS_BEFORE_RECOVERY) {
+        mpu6050_recover_bus();
+    }
+}
+
+// Write one register. Returns false on I2C failure and logs the reason.
+// Persistent failures or a timeout trigger bus recovery.
+static bool mpu6050_write_reg(uint8_t reg, uint8_t val) {
+    int n = mpu6050_write_reg_raw(reg, val);
     if (n != 2) {
         MPU_ERR("i2c write reg=0x%02X val=0x%02X failed (ret=%d)\n",
                 reg, val, n);
+        mpu6050_note_result(n, false);
         return false;
     }
+    mpu6050_note_result(n, true);
     return true;
 }
 
@@ -84,19 +249,24 @@ static bool mpu6050_write_reg(uint8_t reg, uint8_t val) {
 // Returns true on success, false on any I2C failure (dest left untouched).
 // Logs under MPU_DBG only, because this is called from both init and the
 // hot loop — we don't want to spam stdout on every failed control cycle.
+// Persistent failures or a timeout trigger bus recovery.
 static bool mpu6050_burst_read(uint8_t reg, uint8_t *dest, size_t count) {
-    int nw = i2c_write_blocking(MPU_I2C, ADDR, &reg, 1, true);
+    int nw = i2c_write_timeout_us(MPU_I2C, ADDR, &reg, 1, true, I2C_TIMEOUT_US);
     if (nw != 1) {
         MPU_DBG("burst_read reg=0x%02X: write phase failed (ret=%d)\n",
                 reg, nw);
+        mpu6050_note_result(nw, false);
         return false;
     }
-    int nr = i2c_read_blocking(MPU_I2C, ADDR, dest, count, false);
+    int nr = i2c_read_timeout_us(MPU_I2C, ADDR, dest, count, false,
+                                 I2C_TIMEOUT_US);
     if (nr != (int)count) {
         MPU_DBG("burst_read reg=0x%02X: read phase failed (got %d, want %zu)\n",
                 reg, nr, count);
+        mpu6050_note_result(nr, false);
         return false;
     }
+    mpu6050_note_result(nr, true);
     return true;
 }
 
@@ -115,14 +285,16 @@ static bool mpu6050_burst_read(uint8_t reg, uint8_t *dest, size_t count) {
      * MPU_ERR before returning.
      */
     bool mpu6050_init(void) {
-        i2c_init(MPU_I2C, 400 * 1000);
-        gpio_set_function(I2C_SDA_PIN, GPIO_FUNC_I2C);
-        gpio_set_function(I2C_SCL_PIN, GPIO_FUNC_I2C);
-        gpio_pull_up(I2C_SDA_PIN);
-        gpio_pull_up(I2C_SCL_PIN);
-
         // Make the I2C pins available to picotool
         bi_decl(bi_2pins_with_func(I2C_SDA_PIN, I2C_SCL_PIN, GPIO_FUNC_I2C));
+
+        // Clear a slave left holding SDA by a previous MCU reset mid-transfer,
+        // then bring up the peripheral. Not fatal on its own: the reset
+        // below will fail and report if the bus is truly dead.
+        consecutive_failures = 0;
+        if (!i2c_bus_recover()) {
+            MPU_ERR("bus stuck at init — SDA/SCL held low\n");
+        }
 
         // Reset first: DEVICE_RESET wipes all config registers to defaults
         if (!mpu6050_reset()) {
@@ -148,17 +320,6 @@ static bool mpu6050_burst_read(uint8_t reg, uint8_t *dest, size_t count) {
 
         // Config writes — reported individually so you see all problems
         // in one boot instead of fixing them one at a time.
-        static const struct {
-            uint8_t reg;
-            uint8_t val;
-            const char *name;
-        } cfg[] = {
-            { REG_CONFIG,       0x03, "CONFIG (DLPF_CFG=3)"         },
-            { REG_SMPLRT_DIV,   0x09, "SMPLRT_DIV (=9, 100 Hz)"     },
-            { REG_GYRO_CONFIG,  0x00, "GYRO_CONFIG (FS_SEL=0, ±250)"},
-            { REG_ACCEL_CONFIG, 0x00, "ACCEL_CONFIG (AFS_SEL=0, ±2g)"},
-        };
-
         bool all_ok = true;
         for (size_t i = 0; i < sizeof(cfg) / sizeof(cfg[0]); i++) {
             if (!mpu6050_write_reg(cfg[i].reg, cfg[i].val)) {

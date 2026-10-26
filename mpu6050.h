@@ -37,4 +37,20 @@ bool mpu6050_read_gyro(vector_3d *out);
 // (outputs untouched).
 bool mpu6050_read_sample(vector_3d *accel, vector_3d *gyro);
 
+// Clear a stuck I2C bus and restore the sensor configuration.
+// Bit-bangs up to 9 SCL pulses to make a slave release SDA, issues a STOP,
+// re-initializes the I2C peripheral, then re-applies wake + DLPF/rate/range
+// settings (no DEVICE_RESET). Called automatically by the driver after an
+// I2C timeout or repeated failures; may also be called manually.
+// Returns true if the bus was freed and the sensor reconfigured.
+bool mpu6050_recover_bus(void);
+
+// Number of bus recoveries attempted since boot (for diagnostics).
+uint32_t mpu6050_bus_recovery_count(void);
+
+// Timeouts: every I2C transaction is bounded (3 ms), so the read functions
+// above never hang. A timeout triggers recovery immediately; other failures
+// (e.g. NAK) trigger it after 3 consecutive failures. The failing read still
+// returns false; the next read uses the recovered bus.
+
 #endif // MPU6050_H
