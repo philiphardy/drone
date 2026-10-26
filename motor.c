@@ -7,6 +7,7 @@
 #define PULSE_MIN_US    1000u    // idle / init signal (spec: 800-1050 us)
 #define PULSE_MAX_US    2000u    // full throttle (spec: start range 1050-2000 us)
 #define ARM_HOLD_MS     3000u
+#define MAX_THROTTLE_PERCENT 100.0f  // hard cap applied to every throttle command
 
 static void set_pulse_us(uint32_t us) {
     // With a 1 MHz PWM tick, the channel level equals the pulse width in us.
@@ -30,7 +31,8 @@ void motor_arm(void) {
 
 void motor_set_throttle_percent(float percent) {
     if (percent < 0.0f)   percent = 0.0f;
-    if (percent > 100.0f) percent = 100.0f;
+    if (percent > MAX_THROTTLE_PERCENT) percent = MAX_THROTTLE_PERCENT;
+    // +0.5 rounds to the nearest us so float error doesn't truncate 41.1% down a step.
     set_pulse_us(PULSE_MIN_US +
-                 (uint32_t)((PULSE_MAX_US - PULSE_MIN_US) * percent / 100.0f));
+                 (uint32_t)((PULSE_MAX_US - PULSE_MIN_US) * percent / 100.0f + 0.5f));
 }

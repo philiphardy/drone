@@ -6,10 +6,14 @@
 #include "kalman.h"
 #include "motor.h"
 
+// Set to 1 to re-enable the MPU6050 / Kalman filter code.
+#define ENABLE_MPU6050 0
+
 #define RAD_TO_DEG (180.0f / (float)M_PI)
 #define SAMPLE_PERIOD_US 10000          // 100 Hz
 #define BIAS_CAL_SAMPLES 1000           // ~1 s of stationary samples
 
+#if ENABLE_MPU6050
 // Convert raw accelerometer vector to roll/pitch in degrees.
 // At rest, gravity points along -Z when the board is flat.
 static void accel_to_angles(const vector_3d *a, float accel_scale,
@@ -49,15 +53,18 @@ static void calibrate_gyro_bias(float gyro_scale,
     *bias_z = (float)(sz / n) / gyro_scale;
 }
 
+#endif  // ENABLE_MPU6050
+
 int main(void) {
     stdio_init_all();
     
     // Let the USB CDC serial port enumerate before we print.
-    sleep_ms(10000);
+    sleep_ms(5000);
 
     // Start sending the idle pulse immediately so the ESC can initialize.
     motor_init();
 
+#if ENABLE_MPU6050
     if (!mpu6050_init()) {
         printf("MPU6050 init failed — halting\n");
         while (true) sleep_ms(1000);
@@ -91,13 +98,17 @@ int main(void) {
         kalman_init(&roll_kf,  0.0f);
         kalman_init(&pitch_kf, 0.0f);
     }
+#endif  // ENABLE_MPU6050
 
-    // Arm (idle pulse for >= 3 s), then spin at 25% throttle.
+    // Arm (idle pulse for >= 3 s), then hold 41.5%, where the motor begins to spin.
     printf("Arming ESC...\n");
     motor_arm();
-    motor_set_throttle_percent(25.0f);
-    printf("Motor running at 25%% throttle\n");
+    motor_set_throttle_percent(41.5f);
+    printf("Motor running at 41.5%% throttle\n");
 
+#if !ENABLE_MPU6050
+    while (true) sleep_ms(1000);
+#else
     uint64_t last_us = time_us_64();
 
     while (true) {
@@ -134,4 +145,5 @@ int main(void) {
 
         sleep_us(SAMPLE_PERIOD_US);
     }
+#endif  // ENABLE_MPU6050
 }
