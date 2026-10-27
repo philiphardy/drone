@@ -3,15 +3,20 @@
 
 #include <stdbool.h>
 
-#define MOTOR_PIN 0
+#define MOTOR_COUNT 4
+#define MOTOR_FIRST_PIN 0   // motors 0-3 are on GP0-GP3
 
-// Configure GP0 for 50 Hz PWM and output the idle (arming) pulse.
+// Start DSHOT on GP0-GP3 (PIO0, one state machine each; sent from core 1) and begin sending zero throttle.
 void motor_init(void);
 
-// Hold the idle pulse long enough for the ESC to finish initialization.
+// Hold zero throttle long enough for the ESCs to finish initialization.
 void motor_arm(void);
 
-// Throttle as 0-100% of the ESC's 1000-2000 us pulse range (capped at 100%).
+// Throttle for one motor (0 to MOTOR_COUNT-1) as 0-100% (capped at 100%).
+// 0% is stopped (DSHOT 0); above 0% maps to DSHOT 48-2047.
+void motor_set_motor_throttle_percent(unsigned motor, float percent);
+
+// Same throttle for all motors.
 void motor_set_throttle_percent(float percent);
 
 #endif

@@ -100,11 +100,18 @@ int main(void) {
     }
 #endif  // ENABLE_MPU6050
 
-    // Arm (idle pulse for >= 3 s), then hold 41.5%, where the motor begins to spin.
+    // Arm (zero throttle for >= 3 s), ramp up from 0% to 2% in 0.1% steps,
+    // hold at 2% for 3 s, then drop back to 0%.
+    // Loop in tenths of a percent to avoid accumulating float error.
     printf("Arming ESC...\n");
     motor_arm();
-    motor_set_throttle_percent(41.5f);
-    printf("Motor running at 41.5%% throttle\n");
+    for (int tenths = 0; tenths <= 20; tenths++) {
+        motor_set_throttle_percent(tenths / 10.0f);
+        printf("Throttle %d.%d%%\n", tenths / 10, tenths % 10);
+        sleep_ms(tenths == 20 ? 3000 : 1000);
+    }
+    motor_set_throttle_percent(0.0f);
+    printf("Throttle 0%%\n");
 
 #if !ENABLE_MPU6050
     while (true) sleep_ms(1000);

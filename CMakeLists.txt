@@ -37,6 +37,9 @@ pico_sdk_init()
 
 add_executable(drone main.c mpu6050.c kalman.c motor.c)
 
+# Standard (non-inverted) DSHOT transmitter
+pico_generate_pio_header(drone ${CMAKE_CURRENT_LIST_DIR}/dshot_tx.pio)
+
 pico_set_program_name(drone "drone")
 pico_set_program_version(drone "0.1")
 
@@ -45,7 +48,7 @@ pico_enable_stdio_uart(drone 0)
 pico_enable_stdio_usb(drone 1)
 
 # Add the standard library and I2C hardware support to the build
-target_link_libraries(drone pico_stdlib pico_multicore hardware_i2c hardware_pwm)
+target_link_libraries(drone pico_stdlib pico_multicore hardware_i2c hardware_pio)
 
 # Add the standard include files to the build
 target_include_directories(drone PRIVATE

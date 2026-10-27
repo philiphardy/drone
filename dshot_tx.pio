@@ -1,0 +1,36 @@
+; Standard (non-inverted) DSHOT transmitter, 8 PIO cycles per bit.
+;   bit 1: high 6 cycles (75%), low 2 cycles
+;   bit 0: high 3 cycles (37.5%), low 5 cycles
+; The line idles low. Push a 16-bit frame left-aligned in a 32-bit word.
+
+.program dshot_tx
+.side_set 1
+
+start:
+    pull block      side 0          ; idle low until a frame is queued
+    set y, 15       side 0          ; 16 bits per frame
+bitloop:
+    out x, 1        side 1 [1]
+    jmp !x do_zero  side 1
+    nop             side 1 [2]
+    jmp y-- bitloop side 0 [1]      ; end of a 1 bit
+    jmp start       side 0          ; last bit sent
+do_zero:
+    jmp y-- bitloop side 0 [4]      ; end of a 0 bit; falls through to start after the last bit
+
+% c-sdk {
+#include "hardware/clocks.h"
+
+static inline void dshot_tx_program_init(PIO pio, uint sm, uint offset, uint pin, uint dshot_kbps) {
+    pio_sm_config c = dshot_tx_program_get_default_config(offset);
+    sm_config_set_sideset_pins(&c, pin);
+    sm_config_set_out_shift(&c, false, false, 32);   // MSB first, manual pull
+    sm_config_set_clkdiv(&c, (float)clock_get_hz(clk_sys) / (dshot_kbps * 1000.0f * 8.0f));
+
+    pio_gpio_init(pio, pin);
+    pio_sm_set_pins_with_mask(pio, sm, 0, 1u << pin);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+    pio_sm_init(pio, sm, offset, &c);
+    pio_sm_set_enabled(pio, sm, true);
+}
+%}
