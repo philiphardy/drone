@@ -81,7 +81,7 @@ static const struct {
 // ── I2C timeout / recovery tuning ────────────────────────────────
 #define I2C_BAUDRATE_HZ            (400 * 1000)
 // Whole-transaction timeout per i2c_*_timeout_us call. A 14-byte burst at
-// 400 kHz takes ~0.4 ms, and the control loop period is 25 ms, so this
+// 400 kHz takes ~0.4 ms, and the control loop period is 10 ms, so this
 // leaves generous margin without stalling the loop on a dead bus.
 #define I2C_TIMEOUT_US             3000
 // Non-timeout failures (e.g. NAK) trigger recovery after this many in a row.

@@ -12,8 +12,8 @@ typedef struct {
     int16_t z;
 } vector_3d;
 
-// Initialize I2C0 at 400 kHz on GP20 (SDA) / GP21 (SCL), reset the MPU6050,
-// configure DLPF and full-scale ranges, and verify WHO_AM_I.
+// Initialize I2C1 at 400 kHz on GP26 (SDA) / GP27 (SCL), reset the MPU6050,
+// configure DLPF and full-scale ranges, and check WHO_AM_I (mismatch is not fatal).
 // Safe to call exactly once at startup, before any read.
 bool mpu6050_init(void);
 

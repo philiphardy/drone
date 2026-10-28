@@ -1,5 +1,6 @@
 #include "pid.h"
 
+// Clamp v to [-lim, lim].
 static float clampf(float v, float lim) {
     if (v >  lim) return  lim;
     if (v < -lim) return -lim;

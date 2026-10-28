@@ -11,6 +11,8 @@
 #include "motor_test.h"
 #endif
 
+// Bring up stdio and motors, arm the ESCs, then hand off to the flight
+// controller (or motor test). Never returns.
 int main(void) {
     stdio_init_all();
 

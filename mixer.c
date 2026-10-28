@@ -13,6 +13,7 @@
 // +1 if the GP0/GP3 props spin clockwise seen from above, -1 if GP1/GP2 do.
 #define YAW_SIGN 1.0f
 
+// Clamp a motor command to [MIXER_IDLE_THROTTLE_PERCENT, 100].
 static float clamp_throttle(float t) {
     if (t < MIXER_IDLE_THROTTLE_PERCENT) return MIXER_IDLE_THROTTLE_PERCENT;
     if (t > 100.0f) return 100.0f;

@@ -11,8 +11,11 @@ typedef struct {
     float integral;     // accumulated ki * error * dt
 } pid_ctrl_t;
 
+// Clear the accumulated integral term; gains and limits are kept.
 void pid_reset(pid_ctrl_t *p);
 
+// Run one PID step and return kp*error + integral - kd*measurement_rate,
+// clamped to ±out_limit (integral itself clamped to ±i_limit).
 // D acts on measurement_rate (e.g. gyro rate) rather than the differentiated
 // error, so there is no derivative kick and no noisy numerical derivative.
 // Pass integrate = false to freeze the integral (e.g. while on the ground).

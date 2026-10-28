@@ -17,6 +17,7 @@ static uint motor_sm[MOTOR_COUNT];
 // Written by core 0, consumed by core 1.
 static volatile uint16_t target_throttle[MOTOR_COUNT];
 
+// Build a 16-bit DSHOT frame: 11-bit throttle, telemetry bit (0), 4-bit CRC.
 static uint16_t dshot_frame(uint16_t throttle) {
     uint16_t value = (uint16_t)(throttle << 1);   // telemetry bit = 0
     uint16_t crc = (value ^ (value >> 4) ^ (value >> 8)) & 0x0F;
