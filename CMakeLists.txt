@@ -35,7 +35,7 @@ pico_sdk_init()
 
 # Add executable. Default name is the project name, version 0.1
 
-add_executable(drone main.c mpu6050.c kalman.c motor.c)
+add_executable(drone main.c mpu6050.c kalman.c motor.c pid.c)
 
 # Standard (non-inverted) DSHOT transmitter
 pico_generate_pio_header(drone ${CMAKE_CURRENT_LIST_DIR}/dshot_tx.pio)
