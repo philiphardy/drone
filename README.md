@@ -43,9 +43,16 @@ TODO
 
 **Source Layout**
 
-- `drone.c` — application entry point and system initialization
-- `flight_control.c` / `flight_control.h` — control loop and stabilization logic
-- `motor_adjustment.c` / `motor_adjustment.h` — motor output and ESC/motor interfacing
+- `main.c` — entry point: system init, ESC arming, selects flight controller or motor test (`ENABLE_MPU6050`)
+- `flight_controller.c` / `.h` — fixed-rate stabilization loop (roll/pitch level-hold, yaw-rate PIDs)
+- `flight_plan.c` / `.h` — open-loop throttle schedule (spool up, hover, spool down)
+- `attitude.c` / `.h` — attitude estimator: IMU sampling, gyro bias calibration, Kalman-filtered roll/pitch
+- `mixer.c` / `.h` — + configuration motor mixer and motor layout
+- `failsafe.c` / `.h` — stop motors and halt
+- `motor_test.c` / `.h` — bench ramp test without the IMU
+- `pid.c` / `.h` — PID controller
+- `kalman.c` / `.h` — per-axis Kalman filter
+- `motor.c` / `.h` — DSHOT motor output (PIO)
 - `mpu6050.c` / `mpu6050.h` — IMU driver (I2C)
 - `vector_3d.h` — small math helpers for 3D vectors
 - `CMakeLists.txt` — project build configuration
