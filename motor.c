@@ -27,6 +27,7 @@ static uint16_t dshot_frame(uint16_t throttle) {
 static void dshot_core1_entry(void) {
     while (true) {
         for (unsigned i = 0; i < MOTOR_COUNT; i++) {
+            if (!(MOTOR_ENABLED_MASK & (1u << i))) continue;
             pio_sm_put_blocking(motor_pio, motor_sm[i],
                                 (uint32_t)dshot_frame(target_throttle[i]) << 16);
         }

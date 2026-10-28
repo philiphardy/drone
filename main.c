@@ -100,18 +100,19 @@ int main(void) {
     }
 #endif  // ENABLE_MPU6050
 
-    // Arm (zero throttle for >= 3 s), ramp up from 0% to 2% in 0.1% steps,
-    // hold at 2% for 3 s, then drop back to 0%.
-    // Loop in tenths of a percent to avoid accumulating float error.
+    // Arm (zero throttle for >= 3 s), ramp GP1-3 from 10% to 20% in 5% steps (1 s each, 3 s at 20%), then back to 0%.
+    // GP0 is unplugged and is excluded via MOTOR_ENABLED_MASK, so it gets no frames at all.
     printf("Arming ESC...\n");
     motor_arm();
-    for (int tenths = 0; tenths <= 20; tenths++) {
-        motor_set_throttle_percent(tenths / 10.0f);
-        printf("Throttle %d.%d%%\n", tenths / 10, tenths % 10);
-        sleep_ms(tenths == 20 ? 3000 : 1000);
+    for (int percent = 10; percent <= 20; percent += 5) {
+        for (unsigned m = 1; m < MOTOR_COUNT; m++) {
+            motor_set_motor_throttle_percent(m, (float)percent);
+        }
+        printf("Motors 1-3 throttle %d%%\n", percent);
+        sleep_ms(percent == 20 ? 3000 : 1000);
     }
     motor_set_throttle_percent(0.0f);
-    printf("Throttle 0%%\n");
+    printf("Motors 1-3 throttle 0%%\n");
 
 #if !ENABLE_MPU6050
     while (true) sleep_ms(1000);

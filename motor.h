@@ -5,6 +5,7 @@
 
 #define MOTOR_COUNT 4
 #define MOTOR_FIRST_PIN 0   // motors 0-3 are on GP0-GP3
+#define MOTOR_ENABLED_MASK 0xE  // bit n = motor n gets DSHOT frames; motor 0 (GP0) is unplugged
 
 // Start DSHOT on GP0-GP3 (PIO0, one state machine each; sent from core 1) and begin sending zero throttle.
 void motor_init(void);
