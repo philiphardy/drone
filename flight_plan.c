@@ -1,6 +1,6 @@
 #include "flight_plan.h"
 
-#define HOVER_THROTTLE_PERCENT  30.0f   // tune until the drone just holds altitude
+#define HOVER_THROTTLE_PERCENT  8.0f   // tune until the drone just holds altitude
 #define SPOOLUP_TIME_S           3.0f
 #define FLIGHT_TIME_S           10.0f   // no RC link, so the flight ends on a timer
 #define SPOOLDOWN_TIME_S         3.0f
