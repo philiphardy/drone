@@ -5,14 +5,12 @@
 #include "motor.h"
 
 void motor_test_run(void) {
-    for (int percent = 10; percent <= 20; percent += 5) {
-        for (unsigned m = 1; m < MOTOR_COUNT; m++) {
-            motor_set_motor_throttle_percent(m, (float)percent);
-        }
-        printf("Motors 1-3 throttle %d%%\n", percent);
-        sleep_ms(percent == 20 ? 3000 : 1000);
+    for (unsigned m = 0; m < MOTOR_COUNT; m++) {
+        motor_set_motor_throttle_percent(m, 1.0f);
     }
+    printf("All motors throttle 1%%\n");
+    sleep_ms(10000);
     motor_set_throttle_percent(0.0f);
-    printf("Motors 1-3 throttle 0%%\n");
+    printf("All motors throttle 0%%\n");
     while (true) sleep_ms(1000);
 }
