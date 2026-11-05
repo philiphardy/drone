@@ -17,12 +17,12 @@
 #define PRINT_EVERY_N_LOOPS     10
 
 // Outputs are in throttle percent. Angle loops: P in %/deg, D in %/(deg/s).
-static pid_ctrl_t roll_pid  = { .kp = 0.06f, .ki = 0.06f, .kd = 0.010f,
+static pid_ctrl_t roll_pid  = { .kp = 0.06f, .ki = 0.12f, .kd = 0.010f,
                                 .i_limit = 8.0f, .out_limit = 15.0f };
-static pid_ctrl_t pitch_pid = { .kp = 0.06f, .ki = 0.06f, .kd = 0.010f,
+static pid_ctrl_t pitch_pid = { .kp = 0.06f, .ki = 0.12f, .kd = 0.010f,
                                 .i_limit = 8.0f, .out_limit = 15.0f };
 // Yaw holds rate = 0 so motor torque imbalance doesn't spin the frame.
-static pid_ctrl_t yaw_pid   = { .kp = 0.10f, .ki = 0.05f, .kd = 0.0f,
+static pid_ctrl_t yaw_pid   = { .kp = 0.10f, .ki = 0.15f, .kd = 0.0f,
                                 .i_limit = 5.0f, .out_limit = 10.0f };
 
 bool flight_controller_init(void) {
