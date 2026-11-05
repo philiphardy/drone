@@ -10,8 +10,16 @@
 #define MOTOR_NEG_Y 2
 #define MOTOR_POS_X 3
 
+// Static trim for thrust imbalance; scales with throttle because the lean does.
+// Logs show GP1/GP3 (+Y/+X) weaker than GP0/GP2; pairs are balanced so total thrust is unchanged.
+static const float MOTOR_SCALE[4] = {
+    [MOTOR_NEG_X] = 0.86f,
+    [MOTOR_POS_Y] = 1.06f,
+    [MOTOR_NEG_Y] = 0.94f,
+    [MOTOR_POS_X] = 1.14f,
+};
 // +1 if the GP0/GP3 props spin clockwise seen from above, -1 if GP1/GP2 do.
-#define YAW_SIGN 1.0f
+#define YAW_SIGN -1.0f
 
 // Clamp a motor command to [MIXER_IDLE_THROTTLE_PERCENT, 100].
 static float clamp_throttle(float t) {
@@ -22,8 +30,8 @@ static float clamp_throttle(float t) {
 
 void mixer_output(float throttle, float u_roll, float u_pitch, float u_yaw) {
     float yaw = YAW_SIGN * u_yaw;
-    motor_set_motor_throttle_percent(MOTOR_POS_Y, clamp_throttle(throttle + u_roll  - yaw));
-    motor_set_motor_throttle_percent(MOTOR_NEG_Y, clamp_throttle(throttle - u_roll  - yaw));
-    motor_set_motor_throttle_percent(MOTOR_NEG_X, clamp_throttle(throttle + u_pitch + yaw));
-    motor_set_motor_throttle_percent(MOTOR_POS_X, clamp_throttle(throttle - u_pitch + yaw));
+    motor_set_motor_throttle_percent(MOTOR_POS_Y, clamp_throttle(throttle * MOTOR_SCALE[MOTOR_POS_Y] + u_roll  - yaw));
+    motor_set_motor_throttle_percent(MOTOR_NEG_Y, clamp_throttle(throttle * MOTOR_SCALE[MOTOR_NEG_Y] - u_roll  - yaw));
+    motor_set_motor_throttle_percent(MOTOR_NEG_X, clamp_throttle(throttle * MOTOR_SCALE[MOTOR_NEG_X] + u_pitch + yaw));
+    motor_set_motor_throttle_percent(MOTOR_POS_X, clamp_throttle(throttle * MOTOR_SCALE[MOTOR_POS_X] - u_pitch + yaw));
 }

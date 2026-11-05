@@ -64,7 +64,7 @@ enum {
 // Must be float, not double: RP2040 has no hardware double unit and
 // unsuffixed literals would silently fall back to software emulation.
 static const float ACCEL_SCALE = 16384.0f;   // LSB per g
-static const float GYRO_SCALE  = 131.0f;     // LSB per °/s
+static const float GYRO_SCALE  = 65.5f;      // LSB per °/s
 
 // Configuration applied after reset (and re-applied after bus recovery).
 static const struct {
@@ -74,7 +74,7 @@ static const struct {
 } cfg[] = {
     { REG_CONFIG,       0x03, "CONFIG (DLPF_CFG=3)"         },
     { REG_SMPLRT_DIV,   0x09, "SMPLRT_DIV (=9, 100 Hz)"     },
-    { REG_GYRO_CONFIG,  0x00, "GYRO_CONFIG (FS_SEL=0, ±250)"},
+    { REG_GYRO_CONFIG,  0x08, "GYRO_CONFIG (FS_SEL=1, ±500)"},
     { REG_ACCEL_CONFIG, 0x00, "ACCEL_CONFIG (AFS_SEL=0, ±2g)"},
 };
 
@@ -277,7 +277,7 @@ static bool mpu6050_burst_read(uint8_t reg, uint8_t *dest, size_t count) {
      * MPU6050, and apply the configuration the Kalman filter expects:
      *   - DLPF_CFG   = 3 (44 Hz accel / 42 Hz gyro bandwidth)
      *   - SMPLRT_DIV = 9 (100 Hz output rate with DLPF enabled)
-     *   - ±250 °/s gyro (131 LSB/(°/s))
+     *   - ±500 °/s gyro (65.5 LSB/(°/s))
      *   - ±2 g accel    (16384 LSB/g)
      *
      * Returns true only if reset, WHO_AM_I read, and all four config

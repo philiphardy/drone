@@ -42,6 +42,7 @@ add_executable(drone
         attitude.c
         mixer.c
         failsafe.c
+        flight_log.c
         motor_test.c
         mpu6050.c
         kalman.c

@@ -18,7 +18,7 @@ typedef struct {
 bool mpu6050_init(void);
 
 // Scale factors matching the full-scale ranges set by mpu6050_init().
-// Defaults: ±2 g -> 16384.0f LSB/g, ±250 °/s -> 131.0f LSB/(°/s).
+// Defaults: ±2 g -> 16384.0f LSB/g, ±500 °/s -> 65.5f LSB/(°/s).
 // Cache these once at startup; do not call inside the hot loop.
 float mpu6050_accel_scale(void);
 float mpu6050_gyro_scale(void);

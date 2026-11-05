@@ -55,7 +55,7 @@ bool attitude_init(void) {
     if (!mpu6050_init()) return false;
 
     accel_scale = mpu6050_accel_scale();   // 16384.0f
-    gyro_scale  = mpu6050_gyro_scale();    // 131.0f
+    gyro_scale  = mpu6050_gyro_scale();    // 65.5f
 
     printf("MPU6050 Kalman filter — accel_scale=%.1f gyro_scale=%.3f\n",
            accel_scale, gyro_scale);

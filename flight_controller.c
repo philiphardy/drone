@@ -5,21 +5,22 @@
 #include "pico/stdlib.h"
 #include "attitude.h"
 #include "failsafe.h"
+#include "flight_log.h"
 #include "flight_plan.h"
 #include "mixer.h"
 #include "pid.h"
 
 #define LOOP_PERIOD_US          ATTITUDE_SAMPLE_PERIOD_US
-#define INTEGRATE_ABOVE_PERCENT 20.0f   // freeze I-terms on the ground to avoid windup
+#define INTEGRATE_ABOVE_PERCENT 10.0f   // freeze I-terms on the ground to avoid windup
 #define MAX_TILT_DEG            45.0f
 #define MAX_READ_FAILURES       10      // consecutive IMU failures (~100 ms)
 #define PRINT_EVERY_N_LOOPS     10
 
 // Outputs are in throttle percent. Angle loops: P in %/deg, D in %/(deg/s).
-static pid_ctrl_t roll_pid  = { .kp = 0.15f, .ki = 0.05f, .kd = 0.04f,
-                                .i_limit = 5.0f, .out_limit = 15.0f };
-static pid_ctrl_t pitch_pid = { .kp = 0.15f, .ki = 0.05f, .kd = 0.04f,
-                                .i_limit = 5.0f, .out_limit = 15.0f };
+static pid_ctrl_t roll_pid  = { .kp = 0.06f, .ki = 0.06f, .kd = 0.010f,
+                                .i_limit = 8.0f, .out_limit = 15.0f };
+static pid_ctrl_t pitch_pid = { .kp = 0.06f, .ki = 0.06f, .kd = 0.010f,
+                                .i_limit = 8.0f, .out_limit = 15.0f };
 // Yaw holds rate = 0 so motor torque imbalance doesn't spin the frame.
 static pid_ctrl_t yaw_pid   = { .kp = 0.10f, .ki = 0.05f, .kd = 0.0f,
                                 .i_limit = 5.0f, .out_limit = 10.0f };
@@ -70,6 +71,7 @@ void flight_controller_run(void) {
         float u_yaw   = pid_update(&yaw_pid,   0.0f, att.yaw_rate, 0.0f,           dt, integrate);
 
         mixer_output(throttle, u_roll, u_pitch, u_yaw);
+        flight_log_record(throttle, &att, u_roll, u_pitch, u_yaw);
 
         if (++loop_count % PRINT_EVERY_N_LOOPS == 0) {
             printf("thr=%5.1f roll=%6.2f pitch=%6.2f yaw_rate=%6.1f | u_r=%5.2f u_p=%5.2f u_y=%5.2f\n",
