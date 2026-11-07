@@ -6,6 +6,7 @@
 #include "pico/stdlib.h"
 #include "pico/stdio_usb.h"
 #include "tusb.h"
+#include "mpu6050.h"
 
 #define CAPACITY 9000   // 18 s at 500 Hz; the motor test needs ~17 s
 #define HOST_STALL_TIMEOUT_US 5000000
@@ -77,7 +78,9 @@ static bool usb_printf(const char *fmt, ...) {
 }
 
 void flight_log_dump(void) {
-    if (!usb_printf("--- FLIGHT LOG BEGIN (%u samples) ---\n", count)) return;
+    if (!usb_printf("--- FLIGHT LOG BEGIN (%u samples, %lu i2c failures, %lu i2c recoveries) ---\n",
+                    count, (unsigned long)mpu6050_i2c_failure_count(),
+                    (unsigned long)mpu6050_bus_recovery_count())) return;
     if (!usb_printf("t_ms,throttle,roll,pitch,roll_rate,pitch_rate,yaw_rate,u_roll,u_pitch,u_yaw,ax,ay,az,vz\n")) return;
     for (unsigned i = 0; i < count; i++) {
         const sample_t *s = &samples[i];

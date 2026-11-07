@@ -96,6 +96,7 @@ static const struct {
 
 static uint32_t consecutive_failures = 0;
 static uint32_t recovery_count = 0;
+static uint32_t failure_count = 0;
 
 static bool mpu6050_reset(void);
 
@@ -217,6 +218,10 @@ uint32_t mpu6050_bus_recovery_count(void) {
     return recovery_count;
 }
 
+uint32_t mpu6050_i2c_failure_count(void) {
+    return failure_count;
+}
+
 // Track transaction results. A timeout means the bus or slave is hung and
 // triggers recovery at once; other errors must persist before we act.
 static void mpu6050_note_result(int ret, bool ok) {
@@ -224,6 +229,7 @@ static void mpu6050_note_result(int ret, bool ok) {
         consecutive_failures = 0;
         return;
     }
+    failure_count++;
     consecutive_failures++;
     if (ret == PICO_ERROR_TIMEOUT ||
         consecutive_failures >= I2C_FAILS_BEFORE_RECOVERY) {

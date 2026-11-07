@@ -12,7 +12,7 @@ import serial
 from serial.tools import list_ports
 
 PICO_VID = 0x2E8A
-BEGIN_RE = re.compile(r"--- FLIGHT LOG BEGIN \((\d+) samples\)")
+BEGIN_RE = re.compile(r"--- FLIGHT LOG BEGIN \((\d+) samples, (\d+) i2c failures, (\d+) i2c recoveries\)")
 END_MARK = "--- FLIGHT LOG END"
 N_FIELDS = 14
 LOG_DIR = Path(__file__).parent / "flight logs"
@@ -43,11 +43,12 @@ def bad_rows(rows):
 
 
 def read_log(ser):
-    """Return (lines, ok). Retries until a dump matches its advertised sample count."""
+    """Return (lines, ok, (i2c_failures, i2c_recoveries)). Retries until a dump matches its advertised sample count."""
     buf = b""
     lines = None          # header + rows of the dump in progress
     expected = 0
-    best, best_good = None, -1
+    stats = (0, 0)
+    best, best_good, best_stats = None, -1, stats
     requests = 0
     start = time.monotonic()
     request_at = start + START_TIMEOUT_S
@@ -77,14 +78,15 @@ def read_log(ser):
             m = BEGIN_RE.match(line)
             if m:
                 lines, expected = [], int(m.group(1))
+                stats = (int(m.group(2)), int(m.group(3)))
             elif line.startswith(END_MARK) and lines is not None:
                 rows = lines[1:]
                 bad = bad_rows(rows)
                 if len(rows) == expected and bad == 0:
-                    return lines, True
+                    return lines, True, stats
                 print(f"  incomplete dump: {len(rows)}/{expected} rows, {bad} malformed")
                 if len(rows) - bad > best_good:
-                    best, best_good = lines, len(rows) - bad
+                    best, best_good, best_stats = lines, len(rows) - bad, stats
                 lines = None
                 request_at = time.monotonic()
             elif lines is not None and line:
@@ -93,7 +95,7 @@ def read_log(ser):
     if best is None:
         sys.exit("Timed out waiting for the flight log. Is the drone in failsafe (motors stopped) "
                  "and is no other program holding the port?")
-    return best, False
+    return best, False, best_stats
 
 
 def main():
@@ -105,12 +107,13 @@ def main():
     try:
         with serial.Serial(port, 115200, timeout=0.2, write_timeout=1.0) as ser:
             ser.dtr = True
-            lines, ok = read_log(ser)
+            lines, ok, (i2c_failures, i2c_recoveries) = read_log(ser)
     except serial.SerialException as e:
         sys.exit(f"Serial error: {e}")
 
     out.write_text("\n".join(lines) + "\n")
     print(f"Saved {len(lines) - 1} samples to {out}")
+    print(f"IMU I2C failures: {i2c_failures}, bus recoveries: {i2c_recoveries}")
     if not ok:
         print("WARNING: no clean dump received; saved the best one (has missing/garbled rows).")
 
