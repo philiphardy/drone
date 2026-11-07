@@ -4,12 +4,13 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 
-#define CAPACITY 2000   // 20 s at 100 Hz
+#define CAPACITY 9000   // 18 s at 500 Hz; the motor test needs ~17 s
 
-// Fixed point: angles 0.01 deg, rates 0.1 deg/s, throttle and PID outputs 0.01 %.
+// Fixed point: angles 0.01 deg, rates 0.1 deg/s, throttle and PID outputs 0.01 %, accel 0.001 g.
 typedef struct {
     int16_t roll, pitch, roll_rate, pitch_rate, yaw_rate;
     int16_t throttle, u_roll, u_pitch, u_yaw;
+    int16_t ax, ay, az;
 } sample_t;
 
 static sample_t samples[CAPACITY];
@@ -34,19 +35,23 @@ void flight_log_record(float throttle, const attitude_t *att, float u_roll, floa
         .u_roll     = quantize(u_roll,          100.0f),
         .u_pitch    = quantize(u_pitch,         100.0f),
         .u_yaw      = quantize(u_yaw,           100.0f),
+        .ax         = quantize(att->accel_x,   1000.0f),
+        .ay         = quantize(att->accel_y,   1000.0f),
+        .az         = quantize(att->accel_z,   1000.0f),
     };
 }
 
 void flight_log_dump(void) {
     printf("--- FLIGHT LOG BEGIN (%u samples) ---\n", count);
-    printf("t_ms,throttle,roll,pitch,roll_rate,pitch_rate,yaw_rate,u_roll,u_pitch,u_yaw\n");
+    printf("t_ms,throttle,roll,pitch,roll_rate,pitch_rate,yaw_rate,u_roll,u_pitch,u_yaw,ax,ay,az\n");
     for (unsigned i = 0; i < count; i++) {
         const sample_t *s = &samples[i];
-        printf("%u,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f\n",
+        printf("%u,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f\n",
                i * (ATTITUDE_SAMPLE_PERIOD_US / 1000),
                s->throttle / 100.0f, s->roll / 100.0f, s->pitch / 100.0f,
                s->roll_rate / 10.0f, s->pitch_rate / 10.0f, s->yaw_rate / 10.0f,
-               s->u_roll / 100.0f, s->u_pitch / 100.0f, s->u_yaw / 100.0f);
+               s->u_roll / 100.0f, s->u_pitch / 100.0f, s->u_yaw / 100.0f,
+               s->ax / 1000.0f, s->ay / 1000.0f, s->az / 1000.0f);
     }
     printf("--- FLIGHT LOG END ---\n");
 }

@@ -44,6 +44,7 @@ add_executable(drone
         failsafe.c
         flight_log.c
         motor_test.c
+        imu_cal.c
         mpu6050.c
         kalman.c
         motor.c

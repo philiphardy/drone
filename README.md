@@ -43,13 +43,14 @@ TODO
 
 **Source Layout**
 
-- `main.c` — entry point: system init, ESC arming, selects flight controller or motor test (`RUN_MOTOR_TEST`)
+- `main.c` — entry point: system init, ESC arming, selects flight controller, motor test (`RUN_MOTOR_TEST`) or IMU level calibration (`RUN_IMU_CAL`)
 - `flight_controller.c` / `.h` — fixed-rate stabilization loop (roll/pitch level-hold, yaw-rate PIDs)
-- `flight_plan.c` / `.h` — open-loop throttle schedule (spool up, hover, spool down)
+- `flight_plan.c` / `.h` — open-loop throttle schedule (spool up to a peak, spool down to zero)
 - `attitude.c` / `.h` — attitude estimator: IMU sampling, gyro bias calibration, Kalman-filtered roll/pitch
 - `mixer.c` / `.h` — + configuration motor mixer and motor layout
 - `failsafe.c` / `.h` — stop motors and halt
 - `motor_test.c` / `.h` — per-pair bench motor test that logs IMU rates
+- `imu_cal.c` / `.h` — IMU level calibration that prints the mounting offsets for `attitude.c`
 - `pid.c` / `.h` — PID controller
 - `kalman.c` / `.h` — per-axis Kalman filter
 - `motor.c` / `.h` — DSHOT motor output (PIO)

@@ -1,13 +1,13 @@
 #include "kalman.h"
 
 // Defaults match the sensor configuration in mpu6050.c:
-//   DLPF_CFG = 3 (44 Hz / 42 Hz bandwidth), 100 Hz sample rate.
+//   DLPF_CFG = 2 (94 Hz / 98 Hz bandwidth), 500 Hz update rate.
 // Tune by changing exactly one parameter at a time while observing the
 // step response and steady-state noise.
 kalman_params_t g_kalman_params = {
     .Q_angle   = 0.001f,
-    .Q_bias    = 0.003f,
-    .R_measure = 0.03f,
+    .Q_bias    = 0.000001f,  // hold the at-rest bias calibration through a flight
+    .R_measure = 15.0f,      // accel angle is off 15-25° under thrust; ~5 s time constant at 500 Hz
 };
 
 kalman_params_t kalman_default_params(void) {

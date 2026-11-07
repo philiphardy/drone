@@ -10,13 +10,13 @@
 #define MOTOR_NEG_Y 2
 #define MOTOR_POS_X 3
 
-// Static trim for thrust imbalance; scales with throttle because the lean does.
-// Logs show GP1/GP3 (+Y/+X) weaker than GP0/GP2; pairs are balanced so total thrust is unchanged.
+// Static per-motor thrust trim (1.0 = none); keep opposite pairs balanced so total thrust is unchanged.
+// Pitch and roll pairs sized from flight_logs 9-11.
 static const float MOTOR_SCALE[4] = {
-    [MOTOR_NEG_X] = 0.86f,
-    [MOTOR_POS_Y] = 1.06f,
-    [MOTOR_NEG_Y] = 0.94f,
-    [MOTOR_POS_X] = 1.14f,
+    [MOTOR_NEG_X] = 0.932f,
+    [MOTOR_POS_Y] = 1.016f,
+    [MOTOR_NEG_Y] = 0.984f,
+    [MOTOR_POS_X] = 1.068f,
 };
 // +1 if the GP0/GP3 props spin clockwise seen from above, -1 if GP1/GP2 do.
 #define YAW_SIGN -1.0f

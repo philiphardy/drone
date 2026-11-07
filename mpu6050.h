@@ -48,7 +48,7 @@ bool mpu6050_recover_bus(void);
 // Number of bus recoveries attempted since boot (for diagnostics).
 uint32_t mpu6050_bus_recovery_count(void);
 
-// Timeouts: every I2C transaction is bounded (3 ms), so the read functions
+// Timeouts: every I2C transaction is bounded (1 ms), so the read functions
 // above never hang. A timeout triggers recovery immediately; other failures
 // (e.g. NAK) trigger it after 3 consecutive failures. The failing read still
 // returns false; the next read uses the recovered bus.

@@ -7,14 +7,20 @@
 #include "mpu6050.h"
 
 #define RAD_TO_DEG (180.0f / (float)M_PI)
-#define BIAS_CAL_SAMPLES 1000           // ~1 s of stationary samples
+#define BIAS_CAL_SAMPLES   1000         // ~10 s of stationary samples
+#define BIAS_CAL_PERIOD_US 10000
+#define SEED_ANGLE_VAR   0.01f          // deg², one still accel sample
+#define SEED_BIAS_VAR    1e-4f          // (deg/s)², averaged still gyro
+// IMU roll/pitch with the frame level on a level surface; measure with RUN_IMU_CAL in main.c.
+#define IMU_ROLL_OFFSET_DEG  -0.41f
+#define IMU_PITCH_OFFSET_DEG  2.83f
 
 static float accel_scale;   // LSB/g
 static float gyro_scale;    // LSB/(°/s)
 static float yaw_bias;      // °/s; roll/pitch bias is tracked by the Kalman filters
 static kalman_t roll_kf, pitch_kf;
 
-// Convert raw accelerometer vector to roll/pitch in degrees.
+// Convert raw accelerometer vector to the IMU's own roll/pitch in degrees.
 // At rest, gravity points along -Z when the board is flat.
 static void accel_to_angles(const vector_3d *a, float *roll, float *pitch) {
     float ax = a->x / accel_scale;
@@ -23,6 +29,13 @@ static void accel_to_angles(const vector_3d *a, float *roll, float *pitch) {
 
     *roll  = atan2f(ay, az) * RAD_TO_DEG;
     *pitch = atan2f(-ax, sqrtf(ay * ay + az * az)) * RAD_TO_DEG;
+}
+
+// Frame roll/pitch: the IMU's angles minus its mounting tilt.
+static void accel_to_frame_angles(const vector_3d *a, float *roll, float *pitch) {
+    accel_to_angles(a, roll, pitch);
+    *roll  -= IMU_ROLL_OFFSET_DEG;
+    *pitch -= IMU_PITCH_OFFSET_DEG;
 }
 
 // Average the gyro while the device is stationary to seed the bias.
@@ -39,7 +52,7 @@ static void calibrate_gyro_bias(float *bias_x, float *bias_y, float *bias_z) {
             sz += g.z;
             n++;
         }
-        sleep_us(ATTITUDE_SAMPLE_PERIOD_US);
+        sleep_us(BIAS_CAL_PERIOD_US);
     }
 
     if (n == 0) {
@@ -69,13 +82,16 @@ bool attitude_init(void) {
     vector_3d a0, g0;
     if (mpu6050_read_sample(&a0, &g0)) {
         float r0, p0;
-        accel_to_angles(&a0, &r0, &p0);
+        accel_to_frame_angles(&a0, &r0, &p0);
         kalman_init(&roll_kf,  r0);
         kalman_init(&pitch_kf, p0);
         // Seed bias estimates directly so the filter doesn't spend
         // hundreds of milliseconds learning what we already know.
         roll_kf.bias  = bias_x;
         pitch_kf.bias = bias_y;
+        // Unit covariance let spin-up accel noise rewrite the bias by ~50 °/s.
+        roll_kf.P[0][0] = pitch_kf.P[0][0] = SEED_ANGLE_VAR;
+        roll_kf.P[1][1] = pitch_kf.P[1][1] = SEED_BIAS_VAR;
     } else {
         kalman_init(&roll_kf,  0.0f);
         kalman_init(&pitch_kf, 0.0f);
@@ -88,7 +104,7 @@ bool attitude_update(float dt, attitude_t *out) {
     if (!mpu6050_read_sample(&accel, &gyro)) return false;
 
     float roll_acc, pitch_acc;
-    accel_to_angles(&accel, &roll_acc, &pitch_acc);
+    accel_to_frame_angles(&accel, &roll_acc, &pitch_acc);
 
     float gyro_roll  = gyro.x / gyro_scale;   // °/s
     float gyro_pitch = gyro.y / gyro_scale;
@@ -99,5 +115,15 @@ bool attitude_update(float dt, attitude_t *out) {
     out->roll_rate  = gyro_roll  - roll_kf.bias;
     out->pitch_rate = gyro_pitch - pitch_kf.bias;
     out->yaw_rate   = gyro.z / gyro_scale - yaw_bias;
+    out->accel_x    = accel.x / accel_scale;
+    out->accel_y    = accel.y / accel_scale;
+    out->accel_z    = accel.z / accel_scale;
+    return true;
+}
+
+bool attitude_read_imu_angles(float *roll, float *pitch) {
+    vector_3d a;
+    if (!mpu6050_read_acceleration(&a)) return false;
+    accel_to_angles(&a, roll, pitch);
     return true;
 }

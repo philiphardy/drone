@@ -3,8 +3,8 @@
 
 #include <stdbool.h>
 
-// Matches the MPU6050 output rate configured in mpu6050.c (SMPLRT_DIV=9).
-#define ATTITUDE_SAMPLE_PERIOD_US 10000   // 100 Hz
+// IMU read and control period; the MPU6050 outputs at 1 kHz (mpu6050.c), so each read is under 1 ms old.
+#define ATTITUDE_SAMPLE_PERIOD_US 2000    // 500 Hz
 
 // Axes are the ones printed on the GY-521.
 typedef struct {
@@ -13,14 +13,21 @@ typedef struct {
     float roll_rate;    // °/s, bias-corrected
     float pitch_rate;   // °/s, bias-corrected
     float yaw_rate;     // °/s, bias-corrected
+    float accel_x;      // g, mounting offset not removed
+    float accel_y;      // g
+    float accel_z;      // g
 } attitude_t;
 
-// Initialize the IMU, calibrate gyro bias (board must be still for ~1 s),
+// Initialize the IMU, calibrate gyro bias (board must be still for ~10 s),
 // and seed the roll/pitch Kalman filters. Returns false if the IMU failed.
 bool attitude_init(void);
 
 // Read one IMU sample and advance the estimate by dt seconds.
 // Returns false on an IMU read failure (state and *out untouched).
 bool attitude_update(float dt, attitude_t *out);
+
+// Read one accelerometer sample as the IMU's own roll/pitch in degrees, before the
+// mounting offset is removed (for level calibration). Returns false on an IMU read failure.
+bool attitude_read_imu_angles(float *roll, float *pitch);
 
 #endif // ATTITUDE_H

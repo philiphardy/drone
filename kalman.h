@@ -28,7 +28,7 @@ void kalman_init(kalman_t *k, float initial_angle);
 // Returns the new filtered angle.
 float kalman_update(kalman_t *k, float accel_angle, float gyro_rate, float dt);
 
-// Default tuning that works well with DLPF_CFG=3 at 100 Hz.
+// Default tuning that works well with DLPF_CFG=2 at 500 Hz.
 kalman_params_t kalman_default_params(void);
 
 // Global params used by kalman_update (set once after init).

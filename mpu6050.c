@@ -72,8 +72,8 @@ static const struct {
     uint8_t val;
     const char *name;
 } cfg[] = {
-    { REG_CONFIG,       0x03, "CONFIG (DLPF_CFG=3)"         },
-    { REG_SMPLRT_DIV,   0x09, "SMPLRT_DIV (=9, 100 Hz)"     },
+    { REG_CONFIG,       0x02, "CONFIG (DLPF_CFG=2)"         },
+    { REG_SMPLRT_DIV,   0x00, "SMPLRT_DIV (=0, 1 kHz)"      },
     { REG_GYRO_CONFIG,  0x08, "GYRO_CONFIG (FS_SEL=1, ±500)"},
     { REG_ACCEL_CONFIG, 0x00, "ACCEL_CONFIG (AFS_SEL=0, ±2g)"},
 };
@@ -81,9 +81,9 @@ static const struct {
 // ── I2C timeout / recovery tuning ────────────────────────────────
 #define I2C_BAUDRATE_HZ            (400 * 1000)
 // Whole-transaction timeout per i2c_*_timeout_us call. A 14-byte burst at
-// 400 kHz takes ~0.4 ms, and the control loop period is 10 ms, so this
-// leaves generous margin without stalling the loop on a dead bus.
-#define I2C_TIMEOUT_US             3000
+// 400 kHz takes ~0.4 ms, and the control loop period is 2 ms, so this
+// leaves margin without stalling the loop on a dead bus.
+#define I2C_TIMEOUT_US             1000
 // Non-timeout failures (e.g. NAK) trigger recovery after this many in a row.
 // A timeout triggers recovery immediately.
 #define I2C_FAILS_BEFORE_RECOVERY  3
@@ -275,8 +275,8 @@ static bool mpu6050_burst_read(uint8_t reg, uint8_t *dest, size_t count) {
      *
      * Initialize I2C1 at 400 kHz on GP26 (SDA) / GP27 (SCL), reset the
      * MPU6050, and apply the configuration the Kalman filter expects:
-     *   - DLPF_CFG   = 3 (44 Hz accel / 42 Hz gyro bandwidth)
-     *   - SMPLRT_DIV = 9 (100 Hz output rate with DLPF enabled)
+     *   - DLPF_CFG   = 2 (94 Hz accel / 98 Hz gyro bandwidth, ~3 ms delay)
+     *   - SMPLRT_DIV = 0 (1 kHz output rate with DLPF enabled)
      *   - ±500 °/s gyro (65.5 LSB/(°/s))
      *   - ±2 g accel    (16384 LSB/g)
      *

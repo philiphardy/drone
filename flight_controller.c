@@ -13,8 +13,8 @@
 #define LOOP_PERIOD_US          ATTITUDE_SAMPLE_PERIOD_US
 #define INTEGRATE_ABOVE_PERCENT 10.0f   // freeze I-terms on the ground to avoid windup
 #define MAX_TILT_DEG            45.0f
-#define MAX_READ_FAILURES       10      // consecutive IMU failures (~100 ms)
-#define PRINT_EVERY_N_LOOPS     10
+#define MAX_READ_FAILURES       50      // consecutive IMU failures (~100 ms)
+#define PRINT_EVERY_N_LOOPS     50      // 10 Hz
 
 // Outputs are in throttle percent. Angle loops: P in %/deg, D in %/(deg/s).
 static pid_ctrl_t roll_pid  = { .kp = 0.06f, .ki = 0.12f, .kd = 0.010f,
@@ -22,7 +22,8 @@ static pid_ctrl_t roll_pid  = { .kp = 0.06f, .ki = 0.12f, .kd = 0.010f,
 static pid_ctrl_t pitch_pid = { .kp = 0.06f, .ki = 0.12f, .kd = 0.010f,
                                 .i_limit = 8.0f, .out_limit = 15.0f };
 // Yaw holds rate = 0 so motor torque imbalance doesn't spin the frame.
-static pid_ctrl_t yaw_pid   = { .kp = 0.10f, .ki = 0.15f, .kd = 0.0f,
+// Logs need a steady ~+1.7% yaw output; ki 0.5 builds it in ~0.3 s.
+static pid_ctrl_t yaw_pid   = { .kp = 0.10f, .ki = 0.50f, .kd = 0.0f,
                                 .i_limit = 5.0f, .out_limit = 10.0f };
 
 bool flight_controller_init(void) {
