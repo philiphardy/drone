@@ -33,11 +33,11 @@ static void run_step(float baseline, unsigned mask, unsigned duration_ms) {
         sleep_until(next_tick);
 
         attitude_t att;
-        if (!attitude_update(dt, &att)) continue;
+        if (!attitude_update(dt, true, &att)) continue;
         if (fabsf(att.roll) > MAX_TILT_DEG || fabsf(att.pitch) > MAX_TILT_DEG) {
             failsafe("tilt limit exceeded");
         }
-        flight_log_record(baseline, &att, (float)mask, boost, 0.0f);
+        flight_log_record(baseline, &att, (float)mask, boost, 0.0f, 0.0f);
     }
 }
 

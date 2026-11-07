@@ -18,6 +18,7 @@
 static float accel_scale;   // LSB/g
 static float gyro_scale;    // LSB/(°/s)
 static float yaw_bias;      // °/s; roll/pitch bias is tracked by the Kalman filters
+static float az_offset;     // g; this MPU6050 reads ~+0.19 g high on Z
 static kalman_t roll_kf, pitch_kf;
 
 // Convert raw accelerometer vector to the IMU's own roll/pitch in degrees.
@@ -38,18 +39,21 @@ static void accel_to_frame_angles(const vector_3d *a, float *roll, float *pitch)
     *pitch -= IMU_PITCH_OFFSET_DEG;
 }
 
-// Average the gyro while the device is stationary to seed the bias.
-// Returns bias in °/s on each axis.
-static void calibrate_gyro_bias(float *bias_x, float *bias_y, float *bias_z) {
-    double sx = 0, sy = 0, sz = 0;
+// Average the IMU while the device is stationary to seed the gyro bias (°/s on each axis)
+// and az_offset (the Z reading beyond what gravity explains, given X and Y).
+static void calibrate_at_rest(float *bias_x, float *bias_y, float *bias_z) {
+    double sx = 0, sy = 0, sz = 0, sax = 0, say = 0, saz = 0;
     int n = 0;
 
     for (int i = 0; i < BIAS_CAL_SAMPLES; i++) {
-        vector_3d g;
-        if (mpu6050_read_gyro(&g)) {
+        vector_3d a, g;
+        if (mpu6050_read_sample(&a, &g)) {
             sx += g.x;
             sy += g.y;
             sz += g.z;
+            sax += a.x;
+            say += a.y;
+            saz += a.z;
             n++;
         }
         sleep_us(BIAS_CAL_PERIOD_US);
@@ -57,11 +61,15 @@ static void calibrate_gyro_bias(float *bias_x, float *bias_y, float *bias_z) {
 
     if (n == 0) {
         *bias_x = *bias_y = *bias_z = 0.0f;
+        az_offset = 0.0f;
         return;
     }
     *bias_x = (float)(sx / n) / gyro_scale;
     *bias_y = (float)(sy / n) / gyro_scale;
     *bias_z = (float)(sz / n) / gyro_scale;
+    float ax = (float)(sax / n) / accel_scale;
+    float ay = (float)(say / n) / accel_scale;
+    az_offset = (float)(saz / n) / accel_scale - sqrtf(fmaxf(0.0f, 1.0f - ax * ax - ay * ay));
 }
 
 bool attitude_init(void) {
@@ -75,8 +83,8 @@ bool attitude_init(void) {
     printf("Keep the board still during bias calibration...\n");
 
     float bias_x, bias_y;
-    calibrate_gyro_bias(&bias_x, &bias_y, &yaw_bias);
-    printf("Gyro bias: x=%.3f y=%.3f z=%.3f °/s\n", bias_x, bias_y, yaw_bias);
+    calibrate_at_rest(&bias_x, &bias_y, &yaw_bias);
+    printf("Gyro bias: x=%.3f y=%.3f z=%.3f °/s, accel Z offset %+.3f g\n", bias_x, bias_y, yaw_bias, az_offset);
 
     // Seed filters with a first accel reading so they start near reality.
     vector_3d a0, g0;
@@ -99,7 +107,7 @@ bool attitude_init(void) {
     return true;
 }
 
-bool attitude_update(float dt, attitude_t *out) {
+bool attitude_update(float dt, bool use_accel, attitude_t *out) {
     vector_3d accel, gyro;
     if (!mpu6050_read_sample(&accel, &gyro)) return false;
 
@@ -109,8 +117,13 @@ bool attitude_update(float dt, attitude_t *out) {
     float gyro_roll  = gyro.x / gyro_scale;   // °/s
     float gyro_pitch = gyro.y / gyro_scale;
 
-    out->roll  = kalman_update(&roll_kf,  roll_acc,  gyro_roll,  dt);
-    out->pitch = kalman_update(&pitch_kf, pitch_acc, gyro_pitch, dt);
+    if (use_accel) {
+        out->roll  = kalman_update(&roll_kf,  roll_acc,  gyro_roll,  dt);
+        out->pitch = kalman_update(&pitch_kf, pitch_acc, gyro_pitch, dt);
+    } else {
+        out->roll  = roll_kf.angle  += (gyro_roll  - roll_kf.bias)  * dt;
+        out->pitch = pitch_kf.angle += (gyro_pitch - pitch_kf.bias) * dt;
+    }
 
     out->roll_rate  = gyro_roll  - roll_kf.bias;
     out->pitch_rate = gyro_pitch - pitch_kf.bias;
@@ -118,6 +131,13 @@ bool attitude_update(float dt, attitude_t *out) {
     out->accel_x    = accel.x / accel_scale;
     out->accel_y    = accel.y / accel_scale;
     out->accel_z    = accel.z / accel_scale;
+
+    // World up in IMU axes, from the IMU's own tilt (frame angle + mounting offset).
+    float ph = (out->roll  + IMU_ROLL_OFFSET_DEG)  / RAD_TO_DEG;
+    float th = (out->pitch + IMU_PITCH_OFFSET_DEG) / RAD_TO_DEG;
+    float az = out->accel_z - az_offset;
+    out->accel_up = -out->accel_x * sinf(th)
+                  + (out->accel_y * sinf(ph) + az * cosf(ph)) * cosf(th) - 1.0f;
     return true;
 }
 

@@ -16,15 +16,17 @@ typedef struct {
     float accel_x;      // g, mounting offset not removed
     float accel_y;      // g
     float accel_z;      // g
+    float accel_up;     // g, vertical acceleration (specific force along world up - 1 g), az offset removed
 } attitude_t;
 
 // Initialize the IMU, calibrate gyro bias (board must be still for ~10 s),
 // and seed the roll/pitch Kalman filters. Returns false if the IMU failed.
 bool attitude_init(void);
 
-// Read one IMU sample and advance the estimate by dt seconds.
+// Read one IMU sample and advance the estimate by dt seconds. With use_accel false,
+// roll/pitch integrate the gyro only (no accel correction).
 // Returns false on an IMU read failure (state and *out untouched).
-bool attitude_update(float dt, attitude_t *out);
+bool attitude_update(float dt, bool use_accel, attitude_t *out);
 
 // Read one accelerometer sample as the IMU's own roll/pitch in degrees, before the
 // mounting offset is removed (for level calibration). Returns false on an IMU read failure.
