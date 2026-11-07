@@ -9,6 +9,7 @@ typedef struct {
     float throttle;       // %, feedforward collective
     float climb_rate;     // m/s setpoint, up positive
     bool  velocity_loop;  // false while spooling up on the ground (climb-rate loop off)
+    float pitch_probe;    // %, added to the pitch output to identify the motor response
 } flight_setpoint_t;
 
 // t is seconds since the flight started. Returns false once the flight is over.

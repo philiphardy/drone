@@ -12,8 +12,14 @@
 #define HOLD_TIME_S                0.5f
 #define DESCENT_RATE_M_S           0.25f
 #define DESCENT_TIME_S             1.6f   // twice the nominal, so it's down before the motors cut
+// Square wave on pitch from mid-climb (~10 cm, out of ground effect) to the end of the hold.
+#define PROBE_START_S              0.5f
+#define PROBE_HALF_PERIOD_S        0.1f
+#define PROBE_HALF_PERIODS         8      // whole cycles, so it adds no net tilt
+#define PROBE_PERCENT              0.0f   // 0 = off; pitch identified at 0.5 (log 19)
 
 bool flight_plan_setpoint(float t, flight_setpoint_t *sp) {
+    sp->pitch_probe = 0.0f;
     if (t < SPOOLUP_TIME_S) {
         sp->throttle = START_THROTTLE_PERCENT +
                        (LIFTOFF_THROTTLE_PERCENT - START_THROTTLE_PERCENT) * t / SPOOLUP_TIME_S;
@@ -24,6 +30,9 @@ bool flight_plan_setpoint(float t, flight_setpoint_t *sp) {
     t -= SPOOLUP_TIME_S;
     sp->throttle = fminf(LIFTOFF_THROTTLE_PERCENT + FF_RAMP_PERCENT_PER_S * t, HOVER_THROTTLE_PERCENT);
     sp->velocity_loop = true;
+    int half = (int)floorf((t - PROBE_START_S) / PROBE_HALF_PERIOD_S);
+    if (t >= PROBE_START_S && half < PROBE_HALF_PERIODS)
+        sp->pitch_probe = (half % 2 == 0) ? PROBE_PERCENT : -PROBE_PERCENT;
     if (t < CLIMB_TIME_S)
         sp->climb_rate = CLIMB_RATE_M_S;
     else if (t < CLIMB_TIME_S + HOLD_TIME_S)
