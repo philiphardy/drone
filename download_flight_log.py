@@ -3,6 +3,7 @@
 Usage: python download_flight_log.py [COM_PORT]
 Requires: pip install pyserial
 """
+import re
 import sys
 import time
 from pathlib import Path
@@ -11,11 +12,14 @@ import serial
 from serial.tools import list_ports
 
 PICO_VID = 0x2E8A
-BEGIN_MARK = "--- FLIGHT LOG BEGIN"
+BEGIN_RE = re.compile(r"--- FLIGHT LOG BEGIN \((\d+) samples\)")
 END_MARK = "--- FLIGHT LOG END"
+N_FIELDS = 14
 LOG_DIR = Path(__file__).parent / "flight logs"
 START_TIMEOUT_S = 3.0    # the firmware dumps by itself shortly after the port opens
-FINISH_TIMEOUT_S = 30.0
+IDLE_TIMEOUT_S = 2.0     # no data for this long => ask for the log again
+MAX_REQUESTS = 4
+TOTAL_TIMEOUT_S = 120.0
 
 
 def find_port():
@@ -25,29 +29,71 @@ def find_port():
     return ports[0]
 
 
-def read_log(port):
-    lines = []
-    with serial.Serial(port, 115200, timeout=0.2) as ser:
-        ser.dtr = True
-        recording = False
-        nudged = False
-        start = time.monotonic()
-        while True:
-            elapsed = time.monotonic() - start
-            if not recording and not nudged and elapsed > START_TIMEOUT_S:
-                ser.write(b"\n")   # any keypress makes the firmware dump again
-                nudged = True
-            if elapsed > START_TIMEOUT_S + FINISH_TIMEOUT_S:
-                sys.exit("Timed out waiting for the flight log.")
+def bad_rows(rows):
+    bad = 0
+    for row in rows:
+        fields = row.split(",")
+        try:
+            if len(fields) != N_FIELDS:
+                raise ValueError
+            [float(f) for f in fields]
+        except ValueError:
+            bad += 1
+    return bad
 
-            line = ser.readline().decode("utf-8", errors="replace").strip()
-            if line.startswith(BEGIN_MARK):
-                recording = True
-                lines = []
-            elif line.startswith(END_MARK) and recording:
-                return lines
-            elif recording and line:
+
+def read_log(ser):
+    """Return (lines, ok). Retries until a dump matches its advertised sample count."""
+    buf = b""
+    lines = None          # header + rows of the dump in progress
+    expected = 0
+    best, best_good = None, -1
+    requests = 0
+    start = time.monotonic()
+    request_at = start + START_TIMEOUT_S
+
+    while time.monotonic() - start < TOTAL_TIMEOUT_S:
+        if time.monotonic() >= request_at:
+            if requests == MAX_REQUESTS:
+                break
+            requests += 1
+            print(f"No complete log yet, requesting dump ({requests}/{MAX_REQUESTS})...")
+            lines = None
+            try:
+                ser.write(b"\n")   # any keypress makes the firmware dump again
+            except serial.SerialTimeoutException:
+                print("  write timed out (firmware not reading USB?)")
+            request_at = time.monotonic() + IDLE_TIMEOUT_S
+
+        chunk = ser.read(ser.in_waiting or 1)
+        if not chunk:
+            continue
+        request_at = time.monotonic() + IDLE_TIMEOUT_S
+        buf += chunk
+        *complete, buf = buf.split(b"\n")
+
+        for raw in complete:
+            line = raw.decode("utf-8", errors="replace").strip()
+            m = BEGIN_RE.match(line)
+            if m:
+                lines, expected = [], int(m.group(1))
+            elif line.startswith(END_MARK) and lines is not None:
+                rows = lines[1:]
+                bad = bad_rows(rows)
+                if len(rows) == expected and bad == 0:
+                    return lines, True
+                print(f"  incomplete dump: {len(rows)}/{expected} rows, {bad} malformed")
+                if len(rows) - bad > best_good:
+                    best, best_good = lines, len(rows) - bad
+                lines = None
+                request_at = time.monotonic()
+            elif lines is not None and line:
                 lines.append(line)
+
+    if best is None:
+        sys.exit("Timed out waiting for the flight log. Is the drone in failsafe (motors stopped) "
+                 "and is no other program holding the port?")
+    return best, False
 
 
 def main():
@@ -56,9 +102,17 @@ def main():
     out = LOG_DIR / f"flight_log_{len(list(LOG_DIR.glob('flight_log_*.csv'))) + 1}.csv"
 
     print(f"Reading from {port}...")
-    lines = read_log(port)
+    try:
+        with serial.Serial(port, 115200, timeout=0.2, write_timeout=1.0) as ser:
+            ser.dtr = True
+            lines, ok = read_log(ser)
+    except serial.SerialException as e:
+        sys.exit(f"Serial error: {e}")
+
     out.write_text("\n".join(lines) + "\n")
     print(f"Saved {len(lines) - 1} samples to {out}")
+    if not ok:
+        print("WARNING: no clean dump received; saved the best one (has missing/garbled rows).")
 
 
 if __name__ == "__main__":

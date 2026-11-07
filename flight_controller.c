@@ -22,6 +22,7 @@
 #define LANDED_THROTTLE_PERCENT 10.0f   // spool-up start: spins without lifting
 #define LANDED_RAMP_PERCENT_S   50.0f   // hover -> idle in ~0.3 s
 #define STILL_RATE_DPS          20.0f
+#define STILL_FILTER_S          0.05f   // idle vibration spikes roll rate past 20 dps every ~0.2 s (log 22)
 #define STILL_TIME_S            1.0f
 #define LANDED_TIMEOUT_S        3.0f
 
@@ -33,6 +34,9 @@
 #define DOB_T_S                 0.15f   // estimate filter; sim stable over b 340-850, delay+lag 40-100 ms
 #define DOB_LIMIT_X             1.0f    // log 20 needed +0.9 roll / -0.8 pitch; sim stable to 2
 #define DOB_MIN_HEIGHT_M        0.03f   // legs on the ground push back
+// Mean climb need at z 5-15 cm over logs 23-29 (per flight: roll +-0.35, pitch +-0.2).
+#define DOB_PRELOAD_ROLL_X      (-0.15f)
+#define DOB_PRELOAD_PITCH_X     0.3f
 
 // Outputs are in throttle percent. Angle loops: P in %/deg, D in %/(deg/s).
 // ~70 ms motor delay: .06/.12/.010 oscillated (log 12); .025/.04/.014 drifted sideways (log 13).
@@ -58,10 +62,10 @@ typedef struct {
 
 static dob_t roll_dob, pitch_dob;
 
-static void dob_reset(dob_t *o, float rate) {
+static void dob_reset(dob_t *o, float rate, float d0) {
     o->w_f = rate;
-    o->x_f = 0.0f;
-    o->d_hat = 0.0f;
+    o->x_f = -d0;
+    o->d_hat = d0;
 }
 
 // d = accel / b - x_pred, with accel taken as (rate - LPF(rate)) / T so nothing is differentiated.
@@ -96,6 +100,7 @@ void flight_controller_run(void) {
     bool dob_active = false;    // airborne at least once; afterwards held near the ground
     bool landed = false;        // touchdown or end of plan: idle until still, then stop
     float landed_s = 0.0f, still_s = 0.0f, last_throttle = 0.0f;
+    float still_roll = 0.0f, still_pitch = 0.0f, still_yaw = 0.0f;   // low-passed rates
 
     while (true) {
         next_tick = delayed_by_us(next_tick, LOOP_PERIOD_US);
@@ -130,9 +135,12 @@ void flight_controller_run(void) {
         float throttle;
         if (landed) {
             throttle = fmaxf(LANDED_THROTTLE_PERCENT, last_throttle - LANDED_RAMP_PERCENT_S * dt);
-            bool still = fabsf(att.roll_rate)  < STILL_RATE_DPS &&
-                         fabsf(att.pitch_rate) < STILL_RATE_DPS &&
-                         fabsf(att.yaw_rate)   < STILL_RATE_DPS;
+            still_roll  += (att.roll_rate  - still_roll)  * dt / STILL_FILTER_S;
+            still_pitch += (att.pitch_rate - still_pitch) * dt / STILL_FILTER_S;
+            still_yaw   += (att.yaw_rate   - still_yaw)   * dt / STILL_FILTER_S;
+            bool still = fabsf(still_roll)  < STILL_RATE_DPS &&
+                         fabsf(still_pitch) < STILL_RATE_DPS &&
+                         fabsf(still_yaw)   < STILL_RATE_DPS;
             still_s = still ? still_s + dt : 0.0f;
             landed_s += dt;
             if (still_s >= STILL_TIME_S) failsafe("landed");
@@ -166,15 +174,16 @@ void flight_controller_run(void) {
 
         float kx = throttle / 20.0f;   // x per % of u
         if (landed) {
-            dob_reset(&roll_dob,  att.roll_rate);
-            dob_reset(&pitch_dob, att.pitch_rate);
+            dob_reset(&roll_dob,  att.roll_rate,  0.0f);
+            dob_reset(&pitch_dob, att.pitch_rate, 0.0f);
         } else if (sp.velocity_loop && z > DOB_MIN_HEIGHT_M) {
             dob_active = true;
             dob_update(&roll_dob,  att.roll_rate,  dt);
             dob_update(&pitch_dob, att.pitch_rate, dt);
         } else if (!dob_active) {
-            dob_reset(&roll_dob,  att.roll_rate);
-            dob_reset(&pitch_dob, att.pitch_rate);
+            bool liftoff = sp.velocity_loop;
+            dob_reset(&roll_dob,  att.roll_rate,  liftoff ? DOB_PRELOAD_ROLL_X  : 0.0f);
+            dob_reset(&pitch_dob, att.pitch_rate, liftoff ? DOB_PRELOAD_PITCH_X : 0.0f);
         }
         u_roll  -= roll_dob.d_hat  / kx;
         u_pitch -= pitch_dob.d_hat / kx;

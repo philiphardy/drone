@@ -7,8 +7,8 @@
 #include "mpu6050.h"
 
 #define RAD_TO_DEG (180.0f / (float)M_PI)
-#define BIAS_CAL_SAMPLES   1000         // ~10 s of stationary samples
-#define BIAS_CAL_PERIOD_US 10000
+#define BIAS_CAL_SAMPLES   1000         // ~2 s of stationary samples
+#define BIAS_CAL_PERIOD_US 2000
 #define SEED_ANGLE_VAR   0.01f          // deg², one still accel sample
 #define SEED_BIAS_VAR    1e-4f          // (deg/s)², averaged still gyro
 // IMU roll/pitch with the frame level on a level surface; measure with RUN_IMU_CAL in main.c.

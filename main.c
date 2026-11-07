@@ -16,11 +16,11 @@
 int main(void) {
     stdio_init_all();
 
-    // Let the USB CDC serial port enumerate before we print.
-    sleep_ms(2000);
-
     // Start sending the idle pulse immediately so the ESC can initialize.
     motor_init();
+
+    // Let the USB CDC serial port enumerate before we print.
+    sleep_ms(2000);
 
     if (!flight_controller_init()) {
         printf("MPU6050 init failed â€” halting\n");

@@ -8,7 +8,7 @@
 #define DSHOT_THROTTLE_MIN   48u     // 0 = disarmed, 1-47 are reserved for commands
 #define DSHOT_THROTTLE_MAX   2047u
 #define FRAME_PERIOD_US      500u    // 2 kHz frame rate
-#define ARM_HOLD_MS          3000u
+#define ARM_HOLD_MS          1000u   // the ESC has also had idle frames since before the 2 s USB wait and calibration
 #define MAX_THROTTLE_PERCENT 100.0f  // hard cap applied to every throttle command
 
 static PIO motor_pio = pio0;

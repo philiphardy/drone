@@ -1,10 +1,14 @@
 #include "flight_log.h"
 
+#include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
 #include "pico/stdlib.h"
+#include "pico/stdio_usb.h"
+#include "tusb.h"
 
 #define CAPACITY 9000   // 18 s at 500 Hz; the motor test needs ~17 s
+#define HOST_STALL_TIMEOUT_US 5000000
 
 // Fixed point: angles 0.01 deg, rates 0.1 deg/s, throttle and PID outputs 0.01 %, accel 0.001 g, vz 0.001 m/s.
 typedef struct {
@@ -43,17 +47,46 @@ void flight_log_record(float throttle, const attitude_t *att, float u_roll, floa
     };
 }
 
+// stdio_usb silently drops output once the host hasn't read for 500 ms (garbled/missing rows),
+// so only hand it what already fits in the CDC TX FIFO and wait for the host otherwise.
+static bool usb_write(const char *s, int len) {
+    while (len > 0) {
+        absolute_time_t deadline = make_timeout_time_us(HOST_STALL_TIMEOUT_US);
+        int avail;
+        while ((avail = (int)tud_cdc_write_available()) == 0) {
+            if (!stdio_usb_connected() || time_reached(deadline)) return false;
+            sleep_us(100);
+        }
+        int n = len < avail ? len : avail;
+        stdio_put_string(s, n, false, false);
+        s += n;
+        len -= n;
+    }
+    return true;
+}
+
+static bool usb_printf(const char *fmt, ...) {
+    char line[160];
+    va_list args;
+    va_start(args, fmt);
+    int len = vsnprintf(line, sizeof line, fmt, args);
+    va_end(args);
+    if (len < 0) return false;
+    if (len >= (int)sizeof line) len = sizeof line - 1;
+    return usb_write(line, len);
+}
+
 void flight_log_dump(void) {
-    printf("--- FLIGHT LOG BEGIN (%u samples) ---\n", count);
-    printf("t_ms,throttle,roll,pitch,roll_rate,pitch_rate,yaw_rate,u_roll,u_pitch,u_yaw,ax,ay,az,vz\n");
+    if (!usb_printf("--- FLIGHT LOG BEGIN (%u samples) ---\n", count)) return;
+    if (!usb_printf("t_ms,throttle,roll,pitch,roll_rate,pitch_rate,yaw_rate,u_roll,u_pitch,u_yaw,ax,ay,az,vz\n")) return;
     for (unsigned i = 0; i < count; i++) {
         const sample_t *s = &samples[i];
-        printf("%u,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.3f\n",
-               i * (ATTITUDE_SAMPLE_PERIOD_US / 1000),
-               s->throttle / 100.0f, s->roll / 100.0f, s->pitch / 100.0f,
-               s->roll_rate / 10.0f, s->pitch_rate / 10.0f, s->yaw_rate / 10.0f,
-               s->u_roll / 100.0f, s->u_pitch / 100.0f, s->u_yaw / 100.0f,
-               s->ax / 1000.0f, s->ay / 1000.0f, s->az / 1000.0f, s->vz / 1000.0f);
+        if (!usb_printf("%u,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.3f\n",
+                        i * (ATTITUDE_SAMPLE_PERIOD_US / 1000),
+                        s->throttle / 100.0f, s->roll / 100.0f, s->pitch / 100.0f,
+                        s->roll_rate / 10.0f, s->pitch_rate / 10.0f, s->yaw_rate / 10.0f,
+                        s->u_roll / 100.0f, s->u_pitch / 100.0f, s->u_yaw / 100.0f,
+                        s->ax / 1000.0f, s->ay / 1000.0f, s->az / 1000.0f, s->vz / 1000.0f)) return;
     }
-    printf("--- FLIGHT LOG END ---\n");
+    usb_printf("--- FLIGHT LOG END ---\n");
 }

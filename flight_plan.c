@@ -6,7 +6,6 @@
 #define LIFTOFF_THROTTLE_PERCENT  20.0f   // legs stop chattering ~19% (flight_log_11)
 #define HOVER_THROTTLE_PERCENT    24.0f   // vz-loop I settled at ~+0.5 on top of 23.5 (logs 12, 16, 17)
 #define SPOOLUP_TIME_S             1.0f   // START -> LIFTOFF on the ground
-#define FF_RAMP_PERCENT_PER_S     10.0f   // LIFTOFF -> HOVER once the loop is on
 #define CLIMB_RATE_M_S             0.25f
 #define CLIMB_TIME_S               0.8f   // ~20 cm
 #define HOLD_TIME_S                0.5f
@@ -28,7 +27,8 @@ bool flight_plan_setpoint(float t, flight_setpoint_t *sp) {
         return true;
     }
     t -= SPOOLUP_TIME_S;
-    sp->throttle = fminf(LIFTOFF_THROTTLE_PERCENT + FF_RAMP_PERCENT_PER_S * t, HOVER_THROTTLE_PERCENT);
+    // Step, not ramp: a slow ramp leaves it pivoting on its last legs for ~0.3 s (logs 22-24).
+    sp->throttle = HOVER_THROTTLE_PERCENT;
     sp->velocity_loop = true;
     int half = (int)floorf((t - PROBE_START_S) / PROBE_HALF_PERIOD_S);
     if (t >= PROBE_START_S && half < PROBE_HALF_PERIODS)
