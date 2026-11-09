@@ -45,6 +45,8 @@ add_executable(drone
         flight_log.c
         motor_test.c
         imu_cal.c
+        battery.c
+        battery_test.c
         mpu6050.c
         kalman.c
         motor.c
@@ -62,7 +64,7 @@ pico_enable_stdio_uart(drone 0)
 pico_enable_stdio_usb(drone 1)
 
 # Add the standard library and I2C hardware support to the build
-target_link_libraries(drone pico_stdlib pico_multicore hardware_i2c hardware_pio)
+target_link_libraries(drone pico_stdlib pico_multicore hardware_i2c hardware_pio hardware_adc)
 
 # Add the standard include files to the build
 target_include_directories(drone PRIVATE

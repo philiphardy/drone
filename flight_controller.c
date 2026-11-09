@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include "pico/stdlib.h"
 #include "attitude.h"
+#include "battery.h"
 #include "failsafe.h"
 #include "flight_log.h"
 #include "flight_plan.h"
@@ -26,6 +27,9 @@
 #define STILL_FILTER_S          0.05f   // idle vibration spikes roll rate past 20 dps every ~0.2 s (log 22)
 #define STILL_TIME_S            1.0f
 #define LANDED_TIMEOUT_S        3.0f
+#define VBAT_REST_SAMPLES       256
+#define VBAT_LOOP_SAMPLES       8       // ~16 us of the 2 ms loop
+#define VBAT_FILTER_S           0.05f
 
 // Disturbance observer, in x = (m_a^2 - m_b^2)/80 units. Plant from the log 19 pitch probe:
 // angular accel = DOB_B * (lag(command ~16 ms ago) + d), lag ~40 ms.
@@ -90,6 +94,11 @@ bool flight_controller_init(void) {
 }
 
 void flight_controller_run(void) {
+    // Motors are still stopped here, so this is the resting (no-sag) voltage.
+    float vbat = battery_read_volts(VBAT_REST_SAMPLES);
+    float hover = flight_plan_set_battery_volts(vbat);
+    printf("VBAT %.3f V at rest -> hover feedforward %.2f%%\n", vbat, hover);
+
     uint64_t last_us = time_us_64();
     const uint64_t start_us = last_us;
     absolute_time_t next_tick = get_absolute_time();
@@ -195,7 +204,8 @@ void flight_controller_run(void) {
         dob_push(&pitch_dob, kx * u_pitch, dt);
 
         mixer_output(throttle, u_roll, u_pitch, u_yaw);
-        flight_log_record(throttle, &att, u_roll, u_pitch, u_yaw, vz);
+        vbat += (battery_read_volts(VBAT_LOOP_SAMPLES) - vbat) * dt / VBAT_FILTER_S;
+        flight_log_record(throttle, &att, u_roll, u_pitch, u_yaw, vz, vbat);
 
         if (++loop_count % PRINT_EVERY_N_LOOPS == 0) {
             printf("thr=%5.1f roll=%6.2f pitch=%6.2f yaw_rate=%6.1f vz=%5.2f | u_r=%5.2f u_p=%5.2f u_y=%5.2f\n",

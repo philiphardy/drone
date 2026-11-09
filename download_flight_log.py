@@ -14,7 +14,7 @@ from serial.tools import list_ports
 PICO_VID = 0x2E8A
 BEGIN_RE = re.compile(r"--- FLIGHT LOG BEGIN \((\d+) samples, (\d+) i2c failures, (\d+) i2c recoveries\)")
 END_MARK = "--- FLIGHT LOG END"
-N_FIELDS = 14
+N_FIELDS = 15
 LOG_DIR = Path(__file__).parent / "flight logs"
 START_TIMEOUT_S = 3.0    # the firmware dumps by itself shortly after the port opens
 IDLE_TIMEOUT_S = 2.0     # no data for this long => ask for the log again

@@ -3,6 +3,7 @@
 #include <math.h>
 #include "pico/stdlib.h"
 #include "attitude.h"
+#include "battery.h"
 #include "failsafe.h"
 #include "flight_log.h"
 #include "motor.h"
@@ -13,6 +14,7 @@
 #define RECOVER_MS    600
 #define BOOST_PERCENT   4.0f
 #define MAX_TILT_DEG   45.0f
+#define VBAT_SAMPLES    8
 
 // Kept below hover (~26%) so the untethered drone stays on the floor.
 static const float BASELINES[] = { 14.0f, 18.0f };
@@ -37,7 +39,7 @@ static void run_step(float baseline, unsigned mask, unsigned duration_ms) {
         if (fabsf(att.roll) > MAX_TILT_DEG || fabsf(att.pitch) > MAX_TILT_DEG) {
             failsafe("tilt limit exceeded");
         }
-        flight_log_record(baseline, &att, (float)mask, boost, 0.0f, 0.0f);
+        flight_log_record(baseline, &att, (float)mask, boost, 0.0f, 0.0f, battery_read_volts(VBAT_SAMPLES));
     }
 }
 

@@ -8,15 +8,17 @@
 #include "tusb.h"
 #include "mpu6050.h"
 
-#define CAPACITY 9000   // 18 s at 500 Hz; the motor test needs ~17 s
+#define CAPACITY 8800   // 17.6 s at 500 Hz; the motor test needs ~16.9 s. RAM-limited (28 B/sample).
 #define HOST_STALL_TIMEOUT_US 5000000
 
-// Fixed point: angles 0.01 deg, rates 0.1 deg/s, throttle and PID outputs 0.01 %, accel 0.001 g, vz 0.001 m/s.
+// Fixed point: angles 0.01 deg, rates 0.1 deg/s, throttle and PID outputs 0.01 %, accel 0.001 g, vz 0.001 m/s,
+// vbat 0.001 V.
 typedef struct {
     int16_t roll, pitch, roll_rate, pitch_rate, yaw_rate;
     int16_t throttle, u_roll, u_pitch, u_yaw;
     int16_t ax, ay, az;
     int16_t vz;
+    int16_t vbat;
 } sample_t;
 
 static sample_t samples[CAPACITY];
@@ -29,7 +31,8 @@ static int16_t quantize(float v, float scale) {
     return (int16_t)(s < 0.0f ? s - 0.5f : s + 0.5f);
 }
 
-void flight_log_record(float throttle, const attitude_t *att, float u_roll, float u_pitch, float u_yaw, float vz) {
+void flight_log_record(float throttle, const attitude_t *att, float u_roll, float u_pitch, float u_yaw, float vz,
+                       float vbat) {
     if (count >= CAPACITY) return;
     samples[count++] = (sample_t){
         .roll       = quantize(att->roll,       100.0f),
@@ -45,6 +48,7 @@ void flight_log_record(float throttle, const attitude_t *att, float u_roll, floa
         .ay         = quantize(att->accel_y,   1000.0f),
         .az         = quantize(att->accel_z,   1000.0f),
         .vz         = quantize(vz,             1000.0f),
+        .vbat       = quantize(vbat,           1000.0f),
     };
 }
 
@@ -81,15 +85,16 @@ void flight_log_dump(void) {
     if (!usb_printf("--- FLIGHT LOG BEGIN (%u samples, %lu i2c failures, %lu i2c recoveries) ---\n", count,
                     (unsigned long)mpu6050_i2c_failure_count(),
                     (unsigned long)mpu6050_bus_recovery_count())) return;
-    if (!usb_printf("t_ms,throttle,roll,pitch,roll_rate,pitch_rate,yaw_rate,u_roll,u_pitch,u_yaw,ax,ay,az,vz\n")) return;
+    if (!usb_printf("t_ms,throttle,roll,pitch,roll_rate,pitch_rate,yaw_rate,u_roll,u_pitch,u_yaw,ax,ay,az,vz,vbat\n")) return;
     for (unsigned i = 0; i < count; i++) {
         const sample_t *s = &samples[i];
-        if (!usb_printf("%u,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.3f\n",
+        if (!usb_printf("%u,%.2f,%.2f,%.2f,%.1f,%.1f,%.1f,%.2f,%.2f,%.2f,%.3f,%.3f,%.3f,%.3f,%.3f\n",
                         i * (ATTITUDE_SAMPLE_PERIOD_US / 1000),
                         s->throttle / 100.0f, s->roll / 100.0f, s->pitch / 100.0f,
                         s->roll_rate / 10.0f, s->pitch_rate / 10.0f, s->yaw_rate / 10.0f,
                         s->u_roll / 100.0f, s->u_pitch / 100.0f, s->u_yaw / 100.0f,
-                        s->ax / 1000.0f, s->ay / 1000.0f, s->az / 1000.0f, s->vz / 1000.0f)) return;
+                        s->ax / 1000.0f, s->ay / 1000.0f, s->az / 1000.0f, s->vz / 1000.0f,
+                        s->vbat / 1000.0f)) return;
     }
     usb_printf("--- FLIGHT LOG END ---\n");
 }

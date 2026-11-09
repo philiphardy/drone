@@ -43,17 +43,22 @@ TODO
 
 **Source Layout**
 
-- `main.c` — entry point: system init, ESC arming, selects flight controller, motor test (`RUN_MOTOR_TEST`) or IMU level calibration (`RUN_IMU_CAL`)
+- `main.c` — entry point: system init, ESC arming, selects flight controller, motor test (`RUN_MOTOR_TEST`), IMU level calibration (`RUN_IMU_CAL`) or battery voltage test (`RUN_BATTERY_TEST`)
 - `flight_controller.c` / `.h` — fixed-rate stabilization loop (roll/pitch level-hold, yaw-rate PIDs)
-- `flight_plan.c` / `.h` — open-loop throttle schedule (spool up to a peak, spool down to zero)
+- `flight_plan.c` / `.h` — scripted flight standing in for an RC link (spool up, climb, hold, descend by climb-rate setpoint), with hover feedforward scaled to battery voltage
 - `attitude.c` / `.h` — attitude estimator: IMU sampling, gyro bias calibration, Kalman-filtered roll/pitch
 - `mixer.c` / `.h` — + configuration motor mixer and motor layout
-- `failsafe.c` / `.h` — stop motors and halt
+- `failsafe.c` / `.h` — stop motors, dump the flight log and halt
+- `flight_log.c` / `.h` — fixed-point RAM flight log, dumped as CSV over USB
+- `battery.c` / `.h` — 2S pack voltage sensing (ADC, GP28 through a divider)
+- `battery_test.c` / `.h` — bench test that prints the battery voltage over USB
 - `motor_test.c` / `.h` — per-pair bench motor test that logs IMU rates
 - `imu_cal.c` / `.h` — IMU level calibration that prints the mounting offsets for `attitude.c`
 - `pid.c` / `.h` — PID controller
 - `kalman.c` / `.h` — per-axis Kalman filter
 - `motor.c` / `.h` — DSHOT motor output (PIO)
+- `dshot_tx.pio` — PIO program for the DSHOT transmitter
 - `mpu6050.c` / `mpu6050.h` — IMU driver (I2C)
 - `vector_3d.h` — small math helpers for 3D vectors
+- `download_flight_log.py` — saves the flight log from the Pico over USB serial to `flight logs/flight_log_X.csv` (needs `pyserial`)
 - `CMakeLists.txt` — project build configuration

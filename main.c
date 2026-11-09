@@ -6,7 +6,11 @@
 #define RUN_MOTOR_TEST 0
 // 1 = IMU level calibration: motors stay disarmed, offsets print over USB. Overrides RUN_MOTOR_TEST.
 #define RUN_IMU_CAL 0
+// 1 = battery voltage test: motors stay disarmed, VBAT prints over USB. Overrides the others.
+#define RUN_BATTERY_TEST 0
 
+#include "battery.h"
+#include "battery_test.h"
 #include "flight_controller.h"
 #include "imu_cal.h"
 #include "motor_test.h"
@@ -15,14 +19,19 @@
 // controller (or motor test). The IMU calibration runs before arming. Never returns.
 int main(void) {
     stdio_init_all();
+    battery_init();
 
-    #if !RUN_IMU_CAL
+    #if !RUN_IMU_CAL && !RUN_BATTERY_TEST
         // Start sending the idle pulse immediately so the ESC can initialize.
         motor_init();
     #endif
 
     // Let the USB CDC serial port enumerate before we print.
     sleep_ms(2000);
+
+#if RUN_BATTERY_TEST
+    battery_test_run();
+#endif
 
     if (!flight_controller_init()) {
         printf("MPU6050 init failed â€” halting\n");
