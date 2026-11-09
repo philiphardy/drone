@@ -16,7 +16,7 @@
 #define MAX_TILT_DEG   45.0f
 #define VBAT_SAMPLES    8
 
-// Kept below hover (~26%) so the untethered drone stays on the floor.
+// Kept below hover (~25%) so the untethered drone stays on the floor.
 static const float BASELINES[] = { 14.0f, 18.0f };
 // Single motors (GP0..GP3), then GP0+GP3 and GP1+GP2, which spin opposite ways.
 static const unsigned MASKS[] = { 0x1, 0x2, 0x4, 0x8, 0x9, 0x6 };

@@ -6,6 +6,7 @@
 #include "flight_log.h"
 #include "motor.h"
 
+// Discard queued keypresses so a stale one doesn't trigger a log dump.
 static void drain_input(void) {
     while (getchar_timeout_us(0) != PICO_ERROR_TIMEOUT) {}
 }

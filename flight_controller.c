@@ -68,6 +68,7 @@ typedef struct {
 
 static dob_t roll_dob, pitch_dob;
 
+// Restart the observer at `rate` with d_hat preset to d0; the command history is left as is.
 static void dob_reset(dob_t *o, float rate, float d0) {
     o->w_f = rate;
     o->x_f = -d0;
@@ -82,6 +83,7 @@ static void dob_update(dob_t *o, float rate, float dt) {
     o->d_hat = fmaxf(-DOB_LIMIT_X, fminf(d, DOB_LIMIT_X));
 }
 
+// Record command x (x units) and advance x_pred, the delayed, lagged model of what the props deliver.
 static void dob_push(dob_t *o, float x, float dt) {
     float delayed = o->hist[o->head];
     o->hist[o->head] = x;

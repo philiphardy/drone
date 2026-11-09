@@ -8,8 +8,8 @@
 
 // Axes are the ones printed on the GY-521.
 typedef struct {
-    float roll;         // degrees, Kalman-filtered
-    float pitch;        // degrees, Kalman-filtered
+    float roll;         // degrees, Kalman-filtered (gyro-integrated when use_accel is false)
+    float pitch;        // degrees, same as roll
     float roll_rate;    // °/s, bias-corrected
     float pitch_rate;   // °/s, bias-corrected
     float yaw_rate;     // °/s, bias-corrected
@@ -19,7 +19,7 @@ typedef struct {
     float accel_up;     // g, vertical acceleration (specific force along world up - 1 g), az offset removed
 } attitude_t;
 
-// Initialize the IMU, calibrate gyro bias (board must be still for ~10 s),
+// Initialize the IMU, calibrate gyro bias (board must be still for ~2 s),
 // and seed the roll/pitch Kalman filters. Returns false if the IMU failed.
 bool attitude_init(void);
 

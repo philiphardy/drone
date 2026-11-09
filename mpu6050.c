@@ -18,15 +18,13 @@
 #define MPU_I2C i2c1
 
 // ── Logging ──────────────────────────────────────────────────────
-// MPU_ERR is always on; it's used only by init/reset, which run once.
-// MPU_DBG is off by default and used in the hot path (read_* and the
-// low-level burst read) — enable it temporarily to diagnose I2C
-// failures inside the control loop. NOTE: printf via USB CDC is slow
-// (hundreds of µs per call). If the bus is persistently failing you
-// will noticeably slow the loop with this on; use it for debugging,
-// then set it back to 0.
+// MPU_ERR is always on; it's used by init/reset and bus recovery.
+// MPU_DBG is off by default (MPU6050_DEBUG) and used in the hot path (read_* and the
+// low-level burst read) — set MPU6050_DEBUG to 1 temporarily to diagnose I2C failures
+// inside the control loop. NOTE: printf via USB CDC is slow (hundreds of µs per call);
+// if the bus is persistently failing it will noticeably slow the loop.
 #ifndef MPU6050_DEBUG
-#define MPU6050_DEBUG 1
+#define MPU6050_DEBUG 0
 #endif
 
 #define MPU_ERR(fmt, ...) printf("mpu6050 ERROR: " fmt, ##__VA_ARGS__)

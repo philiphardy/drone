@@ -2,7 +2,7 @@
 #include "pico/stdlib.h"
 #include "motor.h"
 
-// 1 = per-pair motor test (logs IMU rates, then dumps), 0 = flight controller.
+// 1 = motor test (each motor, then each pair; logs IMU rates, then dumps), 0 = flight controller.
 #define RUN_MOTOR_TEST 0
 // 1 = IMU level calibration: motors stay disarmed, offsets print over USB. Overrides RUN_MOTOR_TEST.
 #define RUN_IMU_CAL 0
@@ -34,7 +34,7 @@ int main(void) {
 #endif
 
     if (!flight_controller_init()) {
-        printf("MPU6050 init failed â€” halting\n");
+        printf("MPU6050 init failed - halting\n");
         while (true) sleep_ms(1000);
     }
 

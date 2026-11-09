@@ -24,6 +24,7 @@ typedef struct {
 static sample_t samples[CAPACITY];
 static unsigned count;
 
+// Scale v to fixed point, rounding to nearest and saturating to int16.
 static int16_t quantize(float v, float scale) {
     float s = v * scale;
     if (s >  32767.0f) return  32767;
@@ -70,6 +71,7 @@ static bool usb_write(const char *s, int len) {
     return true;
 }
 
+// printf over usb_write (lines truncated to 160 bytes). Returns false if the host stalled.
 static bool usb_printf(const char *fmt, ...) {
     char line[160];
     va_list args;

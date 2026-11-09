@@ -14,7 +14,7 @@
 #define HOLD_TIME_S                1.0f
 #define DESCENT_RATE_M_S           0.25f
 #define DESCENT_TIME_S             4.8f   // backstop only (3x nominal); the touchdown trigger normally ends the descent
-// Square wave on pitch from mid-climb (~10 cm, out of ground effect) to the end of the hold.
+// Square wave on pitch from 0.5 s after spool-up (~10 cm, out of ground effect) for 0.8 s.
 #define PROBE_START_S              0.5f
 #define PROBE_HALF_PERIOD_S        0.1f
 #define PROBE_HALF_PERIODS         8      // whole cycles, so it adds no net tilt
