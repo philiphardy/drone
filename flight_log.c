@@ -78,8 +78,8 @@ static bool usb_printf(const char *fmt, ...) {
 }
 
 void flight_log_dump(void) {
-    if (!usb_printf("--- FLIGHT LOG BEGIN (%u samples, %lu i2c failures, %lu i2c recoveries) ---\n",
-                    count, (unsigned long)mpu6050_i2c_failure_count(),
+    if (!usb_printf("--- FLIGHT LOG BEGIN (%u samples, %lu i2c failures, %lu i2c recoveries) ---\n", count,
+                    (unsigned long)mpu6050_i2c_failure_count(),
                     (unsigned long)mpu6050_bus_recovery_count())) return;
     if (!usb_printf("t_ms,throttle,roll,pitch,roll_rate,pitch_rate,yaw_rate,u_roll,u_pitch,u_yaw,ax,ay,az,vz\n")) return;
     for (unsigned i = 0; i < count; i++) {

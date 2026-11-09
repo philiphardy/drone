@@ -16,8 +16,10 @@
 int main(void) {
     stdio_init_all();
 
-    // Start sending the idle pulse immediately so the ESC can initialize.
-    motor_init();
+    #if !RUN_IMU_CAL
+        // Start sending the idle pulse immediately so the ESC can initialize.
+        motor_init();
+    #endif
 
     // Let the USB CDC serial port enumerate before we print.
     sleep_ms(2000);
@@ -34,9 +36,9 @@ int main(void) {
     motor_arm();
 
     #if RUN_MOTOR_TEST
-    motor_test_run();
+        motor_test_run();
     #else
-    flight_controller_run();
+        flight_controller_run();
     #endif
 #endif
 

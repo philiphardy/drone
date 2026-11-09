@@ -12,8 +12,8 @@
 #define SEED_ANGLE_VAR   0.01f          // deg², one still accel sample
 #define SEED_BIAS_VAR    1e-4f          // (deg/s)², averaged still gyro
 // IMU roll/pitch with the frame level on a level surface; measure with RUN_IMU_CAL in main.c.
-#define IMU_ROLL_OFFSET_DEG  -0.41f
-#define IMU_PITCH_OFFSET_DEG  2.83f
+#define IMU_ROLL_OFFSET_DEG  -0.34f
+#define IMU_PITCH_OFFSET_DEG  3.60f   // cal 2.80 + 0.8: 3.40 still drifted slightly toward GP0 (log 46)
 
 static float accel_scale;   // LSB/g
 static float gyro_scale;    // LSB/(°/s)

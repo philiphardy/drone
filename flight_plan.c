@@ -4,13 +4,13 @@
 
 #define START_THROTTLE_PERCENT    10.0f
 #define LIFTOFF_THROTTLE_PERCENT  20.0f   // legs stop chattering ~19% (flight_log_11)
-#define HOVER_THROTTLE_PERCENT    24.0f   // vz-loop I settled at ~+0.5 on top of 23.5 (logs 12, 16, 17)
+#define HOVER_THROTTLE_PERCENT    25.5f   // hold/descent need 25.2-26.6% (logs 39-42)
 #define SPOOLUP_TIME_S             1.0f   // START -> LIFTOFF on the ground
 #define CLIMB_RATE_M_S             0.25f
-#define CLIMB_TIME_S               0.8f   // ~20 cm
-#define HOLD_TIME_S                0.5f
+#define CLIMB_TIME_S               1.6f   // ~40 cm, plus ~5 cm overshoot into the hold (log 44)
+#define HOLD_TIME_S                1.0f
 #define DESCENT_RATE_M_S           0.25f
-#define DESCENT_TIME_S             1.6f   // twice the nominal, so it's down before the motors cut
+#define DESCENT_TIME_S             4.8f   // backstop only (3x nominal); the touchdown trigger normally ends the descent
 // Square wave on pitch from mid-climb (~10 cm, out of ground effect) to the end of the hold.
 #define PROBE_START_S              0.5f
 #define PROBE_HALF_PERIOD_S        0.1f

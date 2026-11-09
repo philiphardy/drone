@@ -18,6 +18,7 @@
 #define GRAVITY_M_S2            9.81f
 #define ACCEL_UP_LIMIT_G        0.5f    // leg chatter and impacts clip the accel at +2 g
 #define TOUCHDOWN_LAG_M         0.08f   // in-air peak was 5 cm (log 16)
+#define TOUCHDOWN_LAG_LOW_M     0.03f   // used only once z <= 0; in-air lag was <= 0.2 cm in logs 33-41
 #define DESCENT_REF_TAU_S       0.25f   // vz can still be +0.2 when descent starts (log 21)
 #define LANDED_THROTTLE_PERCENT 10.0f   // spool-up start: spins without lifting
 #define LANDED_RAMP_PERCENT_S   50.0f   // hover -> idle in ~0.3 s
@@ -34,9 +35,9 @@
 #define DOB_T_S                 0.15f   // estimate filter; sim stable over b 340-850, delay+lag 40-100 ms
 #define DOB_LIMIT_X             1.0f    // log 20 needed +0.9 roll / -0.8 pitch; sim stable to 2
 #define DOB_MIN_HEIGHT_M        0.03f   // legs on the ground push back
-// Mean climb need at z 5-15 cm over logs 23-29 (per flight: roll +-0.35, pitch +-0.2).
-#define DOB_PRELOAD_ROLL_X      (-0.15f)
-#define DOB_PRELOAD_PITCH_X     0.3f
+// Climb need at z 5-15 cm: roll 0/+0.4/+0.6 in logs 33-35 (after gluing); pitch +0.5..+0.8 in logs 30-34, ~0 in 35.
+#define DOB_PRELOAD_ROLL_X      0.0f
+#define DOB_PRELOAD_PITCH_X     0.55f
 
 // Outputs are in throttle percent. Angle loops: P in %/deg, D in %/(deg/s).
 // ~70 ms motor delay: .06/.12/.010 oscillated (log 12); .025/.04/.014 drifted sideways (log 13).
@@ -49,7 +50,8 @@ static pid_ctrl_t pitch_pid = { .kp = 0.04f, .ki = 0.08f, .kd = 0.014f,
 static pid_ctrl_t yaw_pid   = { .kp = 0.10f, .ki = 0.50f, .kd = 0.0f,
                                 .i_limit = 5.0f, .out_limit = 10.0f };
 // Climb rate: P in %/(m/s), I in %/m. ~0.7 m/s^2 per % near hover => ~1 Hz crossover.
-static pid_ctrl_t vz_pid    = { .kp = 8.0f, .ki = 8.0f, .kd = 0.0f,
+// ki 8 left the hold sinking ~0.1 m/s for 0.6 s (hover need ~25.5% vs ff 24, logs 39-41).
+static pid_ctrl_t vz_pid    = { .kp = 8.0f, .ki = 16.0f, .kd = 0.0f,
                                 .i_limit = 5.0f, .out_limit = 8.0f };
 
 typedef struct {
@@ -152,10 +154,12 @@ void flight_controller_run(void) {
             z += vz * dt;
             if (sp.climb_rate < 0.0f) {
                 vz_ref += (sp.climb_rate - vz_ref) * dt / DESCENT_REF_TAU_S;
-                descent_lag += (vz - vz_ref) * dt;
-                // Near-hover throttle on the ground lets it skate (logs 15-16). z can be ~10 cm off
-                // (log 16), but on the ground vz stops following the setpoint, so the lag grows.
-                if (z <= 0.0f || descent_lag >= TOUCHDOWN_LAG_M) landed = true;
+                // Floored at 0: a fast-reading descent banked -8 cm and delayed touchdown ~1 s (log 47).
+                descent_lag = fmaxf(0.0f, descent_lag + (vz - vz_ref) * dt);
+                // On the ground vz stops following the setpoint, so the lag grows. z alone can read
+                // low on longer flights, so z <= 0 only lowers the lag threshold.
+                if (descent_lag >= TOUCHDOWN_LAG_M ||
+                    (z <= 0.0f && descent_lag >= TOUCHDOWN_LAG_LOW_M)) landed = true;
             } else {
                 vz_ref = vz;
             }
