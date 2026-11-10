@@ -39,7 +39,47 @@ TODO
 
 **Wiring**
 
-TODO
+```mermaid
+flowchart LR
+    BAT["<b>2S LiPo</b><br/>7.4 V nominal / 8.4 V full"]
+
+    BUCK["<img src='voltage%20buck.png' width='150'/><br/><b>LM2596 buck converter</b><br/>set to 5 V"]
+    ESC["<img src='ESC%20board.png' width='300'/><br/><b>AERO SELFIE 30A 4-in-1 ESC</b>"]
+    PICO["<img src='Pico%20Pinout.png' width='600'/><br/><b>Raspberry Pi Pico (RP2040)</b>"]
+    IMU["<img src='MPU-6050.png' width='150'/><br/><b>MPU6050 (GY-521)</b><br/>IMU, I2C addr 0x68"]
+    DIV["<b>Battery divider</b><br/>20k (top) / 10k (bottom), x3"]
+
+    M0["Motor GP0 (-X)"]
+    M1["Motor GP1 (+Y)"]
+    M2["Motor GP2 (-Y)"]
+    M3["Motor GP3 (+X)"]
+
+    %% Power
+    BAT -- "BAT+ / BAT-" --> ESC
+    BAT -- "BAT+ / BAT-" --> BUCK
+    BUCK -- "OUT+ (5 V) to VSYS, pin 39<br/>OUT- to GND, pin 38" --> PICO
+    PICO -- "3V3(OUT), pin 36 to VCC<br/>GND, pin 38 to GND" --> IMU
+
+    %% Signals
+    PICO <-- "GP26 (pin 31) SDA<br/>GP27 (pin 32) SCL<br/>I2C1, pull-ups on GP26/GP27" --> IMU
+    PICO -- "GP0 (pin 1) to signal 4<br/>GP1 (pin 2) to signal 3<br/>GP2 (pin 4) to signal 2<br/>GP3 (pin 5) to signal 1<br/>DSHOT via PIO<br/>GND, pin 3 to ESC connector -" --> ESC
+
+    %% Battery sense
+    BAT -- "BAT+" --> DIV
+    DIV -- "midpoint to GP28 (pin 34, ADC2)<br/>bottom leg to GND (pin 35, AGND)" --> PICO
+
+    %% Motors
+    ESC -- "4A / 4B / 4C" --> M0
+    ESC -- "3A / 3B / 3C" --> M1
+    ESC -- "2A / 2B / 2C" --> M2
+    ESC -- "1A / 1B / 1C" --> M3
+```
+
+Notes:
+
+- All grounds (battery, ESC, buck, Pico, IMU, divider) are common.
+- The ESC `+` pin on its signal connector is battery voltage and is left unconnected, as is the current-sense pin `C`; the ESC has no BEC.
+- ESC channels are wired in reverse order: GP0 to signal 4 and motor outputs 4A-4C, through GP3 to signal 1 and motor outputs 1A-1C.
 
 **Source Layout**
 
