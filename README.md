@@ -32,10 +32,15 @@ Alternatively, use the provided VS Code tasks: `Compile Project` builds with the
 
 **Hardware**
 
-- 1 x 7.6v 2S LiPo Power Supply
-- 1 x RP2040 (MCU)
-- 1 x MPU6050 (IMU)
-TODO
+- 1 x 2S LiPo battery (7.4 V nominal, 8.4 V full, 300 mAh)
+- 1 x Raspberry Pi Pico (RP2040 MCU)
+- 1 x MPU6050 on a GY-521 breakout (IMU)
+- 1 x AERO SELFIE 30A 4-in-1 ESC (DSHOT, no BEC)
+- 4 x 1103 11000KV brushless motors
+- 1 x LM2596 buck converter (set to 5 V, powers the Pico from VSYS)
+- 1 x 20k and 1 x 10k resistor (battery voltage divider to GP28)
+
+See the Wiring section for connections.
 
 **Wiring**
 
