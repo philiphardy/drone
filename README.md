@@ -42,18 +42,18 @@ TODO
 ```mermaid
 %%{init: {"themeVariables": {"fontSize": "48px"}, "themeCSS": ".edgeLabel, .edgeLabel p, .edgeLabel span {font-size: 32px !important;}", "flowchart": {"wrappingWidth": 2400}}}%%
 flowchart TB
-    BAT["<img src='Battery.png' width='600' height='232'/><br/><b>2S LiPo</b><br/>7.4 V nominal / 8.4 V full"]
+    BAT["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Battery.png' width='600' height='232'/><br/><b>2S LiPo</b><br/>7.4 V nominal / 8.4 V full"]
 
-    BUCK["<img src='voltage%20buck.png' width='150'/><br/><b>LM2596 buck converter</b><br/>set to 5 V"]
+    BUCK["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/voltage%20buck.png' width='150'/><br/><b>LM2596 buck converter</b><br/>set to 5 V"]
     DIV["<b>Battery divider</b><br/>20k (top) / 10k (bottom), x3"]
-    PICO["<img src='Pico%20Pinout.png' width='2188' height='1257'/><br/><b>Raspberry Pi Pico (RP2040)</b>"]
-    ESC["<img src='ESC%20board.png' width='676' height='736'/><br/><b>AERO SELFIE 30A 4-in-1 ESC</b>"]
-    IMU["<img src='MPU-6050.png' width='150'/><br/><b>MPU6050 (GY-521)</b><br/>IMU, I2C addr 0x68"]
+    PICO["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Pico%20Pinout.png' width='2188' height='1257'/><br/><b>Raspberry Pi Pico (RP2040)</b>"]
+    ESC["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/ESC%20board.png' width='676' height='736'/><br/><b>AERO SELFIE 30A 4-in-1 ESC</b>"]
+    IMU["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/MPU-6050.png' width='150'/><br/><b>MPU6050 (GY-521)</b><br/>IMU, I2C addr 0x68"]
 
-    M0["<img src='Motor.png' width='217' height='248'/><br/>Motor GP0 (-X)"]
-    M1["<img src='Motor.png' width='217' height='248'/><br/>Motor GP1 (+Y)"]
-    M2["<img src='Motor.png' width='217' height='248'/><br/>Motor GP2 (-Y)"]
-    M3["<img src='Motor.png' width='217' height='248'/><br/>Motor GP3 (+X)"]
+    M0["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Motor.png' width='217' height='248' style='object-fit:contain'/><br/>Motor GP0 (-X)"]
+    M1["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Motor.png' width='217' height='248' style='object-fit:contain'/><br/>Motor GP1 (+Y)"]
+    M2["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Motor.png' width='217' height='248' style='object-fit:contain'/><br/>Motor GP2 (-Y)"]
+    M3["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Motor.png' width='217' height='248' style='object-fit:contain'/><br/>Motor GP3 (+X)"]
 
     %% Power
     BAT -- "BAT+ / BAT-" --> ESC
