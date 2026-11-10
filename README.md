@@ -40,36 +40,36 @@ TODO
 **Wiring**
 
 ```mermaid
-%%{init: {"themeVariables": {"fontSize": "48px"}, "themeCSS": ".edgeLabel, .edgeLabel p, .edgeLabel span {font-size: 32px !important;}", "flowchart": {"wrappingWidth": 2400}}}%%
 flowchart TB
-    BAT["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Battery.png' width='600' height='232'/><br/><b>2S LiPo</b><br/>7.4 V nominal / 8.4 V full"]
+    BAT["<b>2S LiPo</b><br/>7.4 V nominal / 8.4 V full"]
 
-    BUCK["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/voltage%20buck.png' width='150'/><br/><b>LM2596 buck converter</b><br/>set to 5 V"]
+    BUCK["<b>LM2596 buck converter</b><br/>set to 5 V"]
     DIV["<b>Battery divider</b><br/>20k (top) / 10k (bottom), x3"]
-    PICO["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Pico%20Pinout.png' width='2188' height='1257'/><br/><b>Raspberry Pi Pico (RP2040)</b>"]
-    ESC["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/ESC%20board.png' width='676' height='736'/><br/><b>AERO SELFIE 30A 4-in-1 ESC</b>"]
-    IMU["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/MPU-6050.png' width='150'/><br/><b>MPU6050 (GY-521)</b><br/>IMU, I2C addr 0x68"]
+    PICO["<b>Raspberry Pi Pico (RP2040)</b>"]
+    ESC["<b>AERO SELFIE 30A 4-in-1 ESC</b>"]
+    IMU["<b>MPU6050 (GY-521)</b><br/>IMU, I2C addr 0x68"]
 
-    M0["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Motor.png' width='217' height='248' style='object-fit:contain'/><br/>Motor GP0 (-X)"]
-    M1["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Motor.png' width='217' height='248' style='object-fit:contain'/><br/>Motor GP1 (+Y)"]
-    M2["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Motor.png' width='217' height='248' style='object-fit:contain'/><br/>Motor GP2 (-Y)"]
-    M3["<img src='https://raw.githubusercontent.com/philiphardy/drone/master/Motor.png' width='217' height='248' style='object-fit:contain'/><br/>Motor GP3 (+X)"]
+    M0["Motor GP0 (-X)"]
+    M1["Motor GP1 (+Y)"]
+    M2["Motor GP2 (-Y)"]
+    M3["Motor GP3 (+X)"]
 
-    %% Power
+    %% Power: battery to ESC and buck, buck to Pico
     BAT -- "BAT+ / BAT-" --> ESC
     BAT -- "BAT+ / BAT-" --> BUCK
     BUCK -- "OUT+ (5 V) to VSYS, pin 39<br/>OUT- to GND, pin 38" --> PICO
-    PICO -- "3V3(OUT), pin 36 to VCC<br/>GND, pin 38 to GND" --> IMU
 
-    %% Signals
-    PICO <-- "GP26 (pin 31) SDA<br/>GP27 (pin 32) SCL<br/>I2C1, pull-ups on GP26/GP27" --> IMU
-    PICO -- "GP0 (pin 1) to signal 1<br/>GP1 (pin 2) to signal 2<br/>GP2 (pin 4) to signal 3<br/>GP3 (pin 5) to signal 4<br/>DSHOT via PIO<br/>GND, pin 3 to ESC connector -" --> ESC
+    %% IMU: 3.3 V power, ground and I2C (SDA/SCL)
+    PICO -- "3V3 (pin 36) to VCC<br/>GND (pin 38) to GND<br/>GP26 (pin 31) to SDA<br/>GP27 (pin 32) to SCL" --> IMU
 
-    %% Battery sense
+    %% ESC throttle signals (DSHOT)
+    PICO -- "GP0 (pin 1) to signal 1<br/>GP1 (pin 2) to signal 2<br/>GP2 (pin 4) to signal 3<br/>GP3 (pin 5) to signal 4" --> ESC
+
+    %% Battery voltage sense
     BAT -- "BAT+" --> DIV
     DIV -- "midpoint to GP28 (pin 34, ADC2)<br/>bottom leg to GND (pin 35, AGND)" --> PICO
 
-    %% Motors
+    %% Motor phase outputs
     ESC -- "1A / 1B / 1C" --> M0
     ESC -- "2A / 2B / 2C" --> M1
     ESC -- "3A / 3B / 3C" --> M2
