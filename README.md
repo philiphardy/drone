@@ -1,112 +1,97 @@
-**Project Overview**
+# Drone
 
-This repository contains a small flight-control program for the Raspberry Pi Pico (RP2040). It reads an IMU (MPU6050), runs a simple flight-control loop, and drives motor outputs (PWM). It's intended as a hobby / learning project.
+A scratch-built quadcopter with a Raspberry Pi Pico flight controller. It runs a short scripted takeoff, hover, and landing using an MPU6050 for motion sensing, per-axis Kalman filters for roll and pitch, and DShot300 for motor control.
 
-**Prerequisites**
+## What it does today
 
-- **Toolchain**: `arm-none-eabi-gcc` (ARM embedded toolchain)
-- **Build tools**: `cmake`, `ninja`
-- **Pico SDK**: either installed locally or available via `PICO_SDK_PATH` (see project `CMakeLists.txt`)
-- **Flashing tools**: use the Pico UF2 bootloader (drag-and-drop) or the included VS Code tasks which call `picotool` / `openocd`.
+The firmware supplies its own setpoints. The [flight plan](flight_plan.c) spools up the motors, commands a climb, holds a zero vertical-speed setpoint for one second, and commands a descent. During flight the controller keeps roll and pitch near level and targets zero yaw rate. Vertical speed comes from integrating gravity-compensated IMU acceleration, so the estimate can drift.
 
-**Quick Build (cmd.exe)**
+## How it works
 
-1. Create and configure the build directory:
-
-```
-cmake -S . -B build -G Ninja -DPICO_SDK_PATH="%USERPROFILE%\\.pico-sdk\\pico-sdk"
-```
-
-2. Build the firmware:
-
-```
-ninja -C build
+```mermaid
+flowchart LR
+    IMU["MPU6050"] --> Estimator["Attitude estimator"]
+    Estimator --> Control["PID control"]
+    Control --> Mixer["Motor mixer"]
+    Mixer --> ESC["DShot300 ESC"]
 ```
 
-Alternatively, use the provided VS Code tasks: `Compile Project` builds with the project `build` directory.
+- [Attitude estimation](attitude.c) fuses accelerometer tilt and gyro rates using separate [Kalman filters](kalman.c) for roll and pitch. Yaw control uses the measured gyro rate.
+- The [500 Hz control loop](flight_controller.c) combines attitude corrections with a climb-rate controller. The [flight plan](flight_plan.c) scales baseline hover throttle using the resting battery voltage.
+- The [motor mixer](mixer.c) maps throttle and corrections onto the four motors in a plus configuration. The second RP2040 core streams the latest commands at 2 kHz using [PIO](dshot_tx.pio) and the [DShot300 driver](motor.c).
+- The [failsafe](failsafe.c) stops the motors and makes the RAM flight log available over USB. The controller invokes it after landing, on excessive tilt, or after repeated IMU read failures.
 
-**Flash / Run**
+## Hardware and wiring
 
-- Using UF2: put the Pico into BOOTSEL mode and copy `build\drone.uf2` to the mounted drive.
-- Using the provided tasks: run the `Run Project` or `Flash` tasks in VS Code (they call `picotool` and `openocd` respectively).
+| Qty | Part |
+| --- | --- |
+| 1 | Raspberry Pi Pico (RP2040) |
+| 1 | MPU6050 on a GY-521 breakout |
+| 1 | AERO SELFIE 30A 4-in-1 DShot ESC, no BEC |
+| 4 | 1103 11000 KV brushless motors |
+| 1 | 2S 300 mAh LiPo (7.4 V nominal, 8.4 V full) |
+| 1 | LM2596 buck converter set to 5 V |
+| 1 each | 20 kΩ and 10 kΩ resistors for battery sensing |
 
-**Hardware**
-
-- 1 x 2S LiPo battery (7.4 V nominal, 8.4 V full, 300 mAh)
-- 1 x Raspberry Pi Pico (RP2040 MCU)
-- 1 x MPU6050 on a GY-521 breakout (IMU)
-- 1 x AERO SELFIE 30A 4-in-1 ESC (DSHOT, no BEC)
-- 4 x 1103 11000KV brushless motors
-- 1 x LM2596 buck converter (set to 5 V, powers the Pico from VSYS)
-- 1 x 20k and 1 x 10k resistor (battery voltage divider to GP28)
-
-See the Wiring section for connections.
-
-**Wiring**
+| Connection | Pico | Other end |
+| --- | --- | --- |
+| 5 V supply | VSYS (pin 39) | Buck OUT+ |
+| Supply and IMU ground | GND (pin 38) | Buck OUT− and GY-521 GND |
+| IMU power | 3V3 OUT (pin 36) | GY-521 VCC |
+| IMU I²C data | GP26 (pin 31) | GY-521 SDA |
+| IMU I²C clock | GP27 (pin 32) | GY-521 SCL |
+| ESC channel 1 | GP0 (pin 1) | Signal 1, motor −X on 1A/1B/1C |
+| ESC channel 2 | GP1 (pin 2) | Signal 2, motor +Y on 2A/2B/2C |
+| ESC channel 3 | GP2 (pin 4) | Signal 3, motor −Y on 3A/3B/3C |
+| ESC channel 4 | GP3 (pin 5) | Signal 4, motor +X on 4A/4B/4C |
+| Battery sense | GP28 / ADC2 (pin 34) | Divider midpoint |
+| Divider ground | AGND (pin 35) | 10 kΩ resistor ground end |
 
 ```mermaid
 flowchart TB
-    BAT["<b>2S LiPo</b><br/>7.4 V nominal / 8.4 V full"]
-
-    BUCK["<b>LM2596 buck converter</b><br/>set to 5 V"]
-    DIV["<b>Battery divider</b><br/>20k (top) / 10k (bottom), x3"]
-    PICO["<b>Raspberry Pi Pico (RP2040)</b>"]
-    ESC["<b>AERO SELFIE 30A 4-in-1 ESC</b>"]
-    IMU["<b>MPU6050 (GY-521)</b><br/>IMU, I2C addr 0x68"]
-
-    M0["Motor GP0 (-X)"]
-    M1["Motor GP1 (+Y)"]
-    M2["Motor GP2 (-Y)"]
-    M3["Motor GP3 (+X)"]
-
-    %% Power: battery to ESC and buck, buck to Pico
-    BAT -- "BAT+ / BAT-" --> ESC
-    BAT -- "BAT+ / BAT-" --> BUCK
-    BUCK -- "OUT+ (5 V) to VSYS, pin 39<br/>OUT- to GND, pin 38" --> PICO
-
-    %% IMU: 3.3 V power, ground and I2C (SDA/SCL)
-    PICO -- "3V3 (pin 36) to VCC<br/>GND (pin 38) to GND<br/>GP26 (pin 31) to SDA<br/>GP27 (pin 32) to SCL" --> IMU
-
-    %% ESC throttle signals (DSHOT)
-    PICO -- "GP0 (pin 1) to signal 1<br/>GP1 (pin 2) to signal 2<br/>GP2 (pin 4) to signal 3<br/>GP3 (pin 5) to signal 4" --> ESC
-
-    %% Battery voltage sense
-    BAT -- "BAT+" --> DIV
-    DIV -- "midpoint to GP28 (pin 34, ADC2)<br/>bottom leg to GND (pin 35, AGND)" --> PICO
-
-    %% Motor phase outputs
-    ESC -- "1A / 1B / 1C" --> M0
-    ESC -- "2A / 2B / 2C" --> M1
-    ESC -- "3A / 3B / 3C" --> M2
-    ESC -- "4A / 4B / 4C" --> M3
+    Battery["2S LiPo"] --> ESC["4-in-1 ESC"]
+    Battery --> Buck["5 V buck converter"]
+    Battery --> Divider["20 kΩ / 10 kΩ divider"]
+    Buck -->|VSYS| Pico["Raspberry Pi Pico"]
+    Divider -->|ADC2| Pico
+    Pico -->|DShot300| ESC
+    Pico <-->|I²C| IMU["MPU6050"]
+    ESC --> Motors["Four brushless motors"]
 ```
 
-Notes:
+Connect the battery, ESC, buck converter, Pico, IMU, and divider to a common ground. Set the buck converter to 5 V before connecting VSYS. Leave the ESC signal connector’s `+` (pack voltage) and `C` (current sense) pins open. The 20 kΩ resistor goes from BAT+ to GP28 and the 10 kΩ resistor goes from GP28 to ground. At 8.4 V pack voltage, the divider puts 2.8 V on GP28. The MPU6050 uses I²C address `0x68`.
 
-- All grounds (battery, ESC, buck, Pico, IMU, divider) are common.
-- The ESC `+` pin on its signal connector is battery voltage and is left unconnected, as is the current-sense pin `C`; the ESC has no BEC.
-- Motor GPn uses ESC channel n+1 for both signal and outputs: GP0 to signal 1 and 1A-1C, through GP3 to signal 4 and 4A-4C.
-- Set the buck converter to 5 V before connecting it to VSYS.
-- The battery divider is 20k from BAT+ to GP28 and 10k from GP28 to GND (x3 ratio), which keeps GP28 at or below 2.8 V on a full 8.4 V pack.
+## Build, flash, and test
 
-**Source Layout**
+Install the Arm embedded GCC toolchain, CMake, Ninja, and the Pico SDK with its submodules. The [CMake configuration](CMakeLists.txt) selects the original Raspberry Pi Pico and specifies Pico SDK 2.2.0 for the VS Code extension. Set `PICO_SDK_PATH` to your SDK root and put CMake, Ninja, and the Arm toolchain on your PATH.
 
-- `main.c` — entry point: system init, ESC arming, selects flight controller, motor test (`RUN_MOTOR_TEST`), IMU level calibration (`RUN_IMU_CAL`) or battery voltage test (`RUN_BATTERY_TEST`)
-- `flight_controller.c` / `.h` — fixed-rate stabilization loop (roll/pitch level-hold, yaw-rate PIDs)
-- `flight_plan.c` / `.h` — scripted flight standing in for an RC link (spool up, climb, hold, descend by climb-rate setpoint), with hover feedforward scaled to battery voltage
-- `attitude.c` / `.h` — attitude estimator: IMU sampling, gyro bias calibration, Kalman-filtered roll/pitch
-- `mixer.c` / `.h` — + configuration motor mixer and motor layout
-- `failsafe.c` / `.h` — stop motors, dump the flight log and halt
-- `flight_log.c` / `.h` — fixed-point RAM flight log, dumped as CSV over USB
-- `battery.c` / `.h` — 2S pack voltage sensing (ADC, GP28 through a divider)
-- `battery_test.c` / `.h` — bench test that prints the battery voltage over USB
-- `motor_test.c` / `.h` — per-pair bench motor test that logs IMU rates
-- `imu_cal.c` / `.h` — IMU level calibration that prints the mounting offsets for `attitude.c`
-- `pid.c` / `.h` — PID controller
-- `kalman.c` / `.h` — per-axis Kalman filter
-- `motor.c` / `.h` — DSHOT motor output (PIO)
-- `dshot_tx.pio` — PIO program for the DSHOT transmitter
-- `mpu6050.c` / `mpu6050.h` — IMU driver (I2C)
-- `vector_3d.h` — small math helpers for 3D vectors
-- `download_flight_log.py` — saves the flight log from the Pico over USB serial to `flight logs/flight_log_X.csv` (needs `pyserial`)
-- `CMakeLists.txt` — project build configuration
+```console
+cmake -S . -B build -G Ninja
+cmake --build build
+```
+
+**The default firmware arms and starts the scripted flight automatically after initialization. Remove the propellers before flashing or bench testing.**
+
+Hold **BOOTSEL** while connecting the Pico over USB, then copy `build/drone.uf2` to the mounted drive. With the Pico VS Code extension configured, **Compile Project** builds the configured project, **Run Project** uses `picotool`, and **Flash** uses OpenOCD with a debug probe.
+
+Set a flag in [`main.c`](main.c) to `1`, then rebuild and flash. The modes below are listed in priority order.
+
+| Flag | Behavior |
+| --- | --- |
+| `RUN_BATTERY_TEST` | Prints pack voltage over USB with the motors disarmed. |
+| `RUN_IMU_CAL` | Prints level mounting offsets over USB with the motors disarmed. |
+| `RUN_MOTOR_TEST` | Arms the ESC, spins individual motors and then motor pairs, and logs IMU rates. |
+| All flags set to `0` | Arms the ESC and runs the scripted flight. |
+
+## Download a flight log
+
+Once the run ends, connect the Pico to your computer over USB and run these commands.
+
+```console
+python -m pip install pyserial
+python download_flight_log.py
+```
+
+The script detects a single attached Pico automatically. If needed, pass the serial port explicitly, for example `python download_flight_log.py COM5`. Keep the Pico powered until the download finishes. The log lives in RAM and a reset clears it.
+
+The script writes `flight logs/flight_log_X.csv`. Plot `throttle` and `vz` against `t_ms` to see the flight phases. Plot `roll`, `pitch`, and the corresponding controller corrections to inspect stabilization. Use `vbat` to see battery voltage under load.
